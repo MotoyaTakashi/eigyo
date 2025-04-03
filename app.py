@@ -10,7 +10,7 @@ def init_db():
     # 顧客テーブル
     c.execute('''
         CREATE TABLE IF NOT EXISTS customers
-        (id INTEGER PRIMARY KEY AUTOINCREMENT,
+        (corporate_number TEXT PRIMARY KEY,
          company_name TEXT NOT NULL,
          contact_person TEXT,
          email TEXT,
@@ -23,62 +23,40 @@ def init_db():
     c.execute('''
         CREATE TABLE IF NOT EXISTS projects
         (id INTEGER PRIMARY KEY AUTOINCREMENT,
-         customer_id INTEGER,
+         corporate_number TEXT,
          project_name TEXT NOT NULL,
          status TEXT,
          start_date TEXT,
          end_date TEXT,
          budget INTEGER,
          description TEXT,
-         FOREIGN KEY (customer_id) REFERENCES customers (id))
+         FOREIGN KEY (corporate_number) REFERENCES customers (corporate_number))
     ''')
     # 営業日報テーブル
     c.execute('''
         CREATE TABLE IF NOT EXISTS daily_reports
         (id INTEGER PRIMARY KEY AUTOINCREMENT,
          report_date TEXT NOT NULL,
-         customer_id INTEGER,
+         corporate_number TEXT,
          project_id INTEGER,
          contact_type TEXT,
          contact_content TEXT,
          next_action TEXT,
          notes TEXT,
-         FOREIGN KEY (customer_id) REFERENCES customers (id),
+         FOREIGN KEY (corporate_number) REFERENCES customers (corporate_number),
          FOREIGN KEY (project_id) REFERENCES projects (id))
     ''')
     conn.commit()
     conn.close()
 
 # 顧客データの追加
-def add_customer(company_name, contact_person, email, phone, address, notes):
+def add_customer(corporate_number, company_name, contact_person, email, phone, address, last_contact_date, notes):
     conn = sqlite3.connect('customers.db')
     c = conn.cursor()
     c.execute('''
-        INSERT INTO customers (company_name, contact_person, email, phone, address, last_contact_date, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (company_name, contact_person, email, phone, address, datetime.now().strftime('%Y-%m-%d'), notes))
-    conn.commit()
-    conn.close()
-
-# 案件データの追加
-def add_project(customer_id, project_name, status, start_date, end_date, budget, description):
-    conn = sqlite3.connect('customers.db')
-    c = conn.cursor()
-    c.execute('''
-        INSERT INTO projects (customer_id, project_name, status, start_date, end_date, budget, description)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (customer_id, project_name, status, start_date, end_date, budget, description))
-    conn.commit()
-    conn.close()
-
-# 営業日報の追加
-def add_daily_report(report_date, customer_id, project_id, contact_type, contact_content, next_action, notes):
-    conn = sqlite3.connect('customers.db')
-    c = conn.cursor()
-    c.execute('''
-        INSERT INTO daily_reports (report_date, customer_id, project_id, contact_type, contact_content, next_action, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (report_date, customer_id, project_id, contact_type, contact_content, next_action, notes))
+        INSERT INTO customers (corporate_number, company_name, contact_person, email, phone, address, last_contact_date, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (corporate_number, company_name, contact_person, email, phone, address, last_contact_date, notes))
     conn.commit()
     conn.close()
 
@@ -89,79 +67,65 @@ def get_customers():
     conn.close()
     return df
 
-# 案件データの取得
-def get_projects(customer_id=None):
-    conn = sqlite3.connect('customers.db')
-    if customer_id:
-        df = pd.read_sql_query("""
-            SELECT p.*, c.company_name 
-            FROM projects p 
-            JOIN customers c ON p.customer_id = c.id 
-            WHERE p.customer_id = ?
-        """, conn, params=(customer_id,))
-    else:
-        df = pd.read_sql_query("""
-            SELECT p.*, c.company_name 
-            FROM projects p 
-            JOIN customers c ON p.customer_id = c.id
-        """, conn)
-    conn.close()
-    return df
-
-# 営業日報の取得
-def get_daily_reports():
-    conn = sqlite3.connect('customers.db')
-    df = pd.read_sql_query("""
-        SELECT r.*, c.company_name, p.project_name
-        FROM daily_reports r
-        LEFT JOIN customers c ON r.customer_id = c.id
-        LEFT JOIN projects p ON r.project_id = p.id
-        ORDER BY r.report_date DESC
-    """, conn)
-    conn.close()
-    return df
-
 # 顧客データの更新
-def update_customer(id, company_name, contact_person, email, phone, address, notes):
+def update_customer(corporate_number, company_name, contact_person, email, phone, address, last_contact_date, notes):
     conn = sqlite3.connect('customers.db')
     c = conn.cursor()
     c.execute('''
         UPDATE customers
-        SET company_name=?, contact_person=?, email=?, phone=?, address=?, notes=?
-        WHERE id=?
-    ''', (company_name, contact_person, email, phone, address, notes, id))
-    conn.commit()
-    conn.close()
-
-# 案件データの更新
-def update_project(id, project_name, status, start_date, end_date, budget, description):
-    conn = sqlite3.connect('customers.db')
-    c = conn.cursor()
-    c.execute('''
-        UPDATE projects
-        SET project_name=?, status=?, start_date=?, end_date=?, budget=?, description=?
-        WHERE id=?
-    ''', (project_name, status, start_date, end_date, budget, description, id))
-    conn.commit()
-    conn.close()
-
-# 営業日報の更新
-def update_daily_report(id, report_date, customer_id, project_id, contact_type, contact_content, next_action, notes):
-    conn = sqlite3.connect('customers.db')
-    c = conn.cursor()
-    c.execute('''
-        UPDATE daily_reports
-        SET report_date=?, customer_id=?, project_id=?, contact_type=?, contact_content=?, next_action=?, notes=?
-        WHERE id=?
-    ''', (report_date, customer_id, project_id, contact_type, contact_content, next_action, notes, id))
+        SET company_name=?, contact_person=?, email=?, phone=?, address=?, last_contact_date=?, notes=?
+        WHERE corporate_number=?
+    ''', (company_name, contact_person, email, phone, address, last_contact_date, notes, corporate_number))
     conn.commit()
     conn.close()
 
 # 顧客データの削除
-def delete_customer(id):
+def delete_customer(corporate_number):
     conn = sqlite3.connect('customers.db')
     c = conn.cursor()
-    c.execute('DELETE FROM customers WHERE id=?', (id,))
+    c.execute('DELETE FROM customers WHERE corporate_number=?', (corporate_number,))
+    conn.commit()
+    conn.close()
+
+# 案件データの追加
+def add_project(corporate_number, project_name, status, start_date, end_date, budget, description):
+    conn = sqlite3.connect('customers.db')
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO projects (corporate_number, project_name, status, start_date, end_date, budget, description)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (corporate_number, project_name, status, start_date, end_date, budget, description))
+    conn.commit()
+    conn.close()
+
+# 案件データの取得
+def get_projects(corporate_number=None):
+    conn = sqlite3.connect('customers.db')
+    if corporate_number:
+        df = pd.read_sql_query("""
+            SELECT p.*, c.company_name
+            FROM projects p
+            JOIN customers c ON p.corporate_number = c.corporate_number
+            WHERE p.corporate_number = ?
+        """, conn, params=(corporate_number,))
+    else:
+        df = pd.read_sql_query("""
+            SELECT p.*, c.company_name
+            FROM projects p
+            JOIN customers c ON p.corporate_number = c.corporate_number
+        """, conn)
+    conn.close()
+    return df
+
+# 案件データの更新
+def update_project(id, corporate_number, project_name, status, start_date, end_date, budget, description):
+    conn = sqlite3.connect('customers.db')
+    c = conn.cursor()
+    c.execute('''
+        UPDATE projects
+        SET corporate_number=?, project_name=?, status=?, start_date=?, end_date=?, budget=?, description=?
+        WHERE id=?
+    ''', (corporate_number, project_name, status, start_date, end_date, budget, description, id))
     conn.commit()
     conn.close()
 
@@ -170,6 +134,42 @@ def delete_project(id):
     conn = sqlite3.connect('customers.db')
     c = conn.cursor()
     c.execute('DELETE FROM projects WHERE id=?', (id,))
+    conn.commit()
+    conn.close()
+
+# 営業日報の追加
+def add_daily_report(report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes):
+    conn = sqlite3.connect('customers.db')
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO daily_reports (report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes))
+    conn.commit()
+    conn.close()
+
+# 営業日報の取得
+def get_daily_reports():
+    conn = sqlite3.connect('customers.db')
+    df = pd.read_sql_query("""
+        SELECT r.*, c.company_name, p.project_name
+        FROM daily_reports r
+        LEFT JOIN customers c ON r.corporate_number = c.corporate_number
+        LEFT JOIN projects p ON r.project_id = p.id
+        ORDER BY r.report_date DESC
+    """, conn)
+    conn.close()
+    return df
+
+# 営業日報の更新
+def update_daily_report(id, report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes):
+    conn = sqlite3.connect('customers.db')
+    c = conn.cursor()
+    c.execute('''
+        UPDATE daily_reports
+        SET report_date=?, corporate_number=?, project_id=?, contact_type=?, contact_content=?, next_action=?, notes=?
+        WHERE id=?
+    ''', (report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes, id))
     conn.commit()
     conn.close()
 
@@ -267,12 +267,12 @@ def main():
             df = get_customers()
             if not df.empty:
                 # 表示する列を選択
-                display_columns = ['id', 'company_name', 'contact_person', 'email', 'phone', 'address', 'last_contact_date', 'notes']
+                display_columns = ['corporate_number', 'company_name', 'contact_person', 'email', 'phone', 'address', 'last_contact_date', 'notes']
                 display_df = df[display_columns].copy()
                 
                 # 列名を日本語に変更
                 column_names = {
-                    'id': 'ID',
+                    'corporate_number': '法人番号',
                     'company_name': '会社名',
                     'contact_person': '担当者名',
                     'email': 'メールアドレス',
@@ -291,38 +291,62 @@ def main():
         elif sub_menu in ['顧客追加', 'Add Customer']:
             st.header('顧客追加')
             with st.form('add_customer_form'):
+                corporate_number = st.text_input('法人番号')
                 company_name = st.text_input('会社名')
                 contact_person = st.text_input('担当者名')
                 email = st.text_input('メールアドレス')
                 phone = st.text_input('電話番号')
-                address = st.text_input('住所')
+                address = st.text_area('住所')
+                last_contact_date = st.date_input('最終接触日')
                 notes = st.text_area('備考')
                 
                 if st.form_submit_button('追加'):
                     if company_name:
-                        add_customer(company_name, contact_person, email, phone, address, notes)
+                        add_customer(
+                            corporate_number,
+                            company_name,
+                            contact_person,
+                            email,
+                            phone,
+                            address,
+                            last_contact_date.strftime('%Y-%m-%d'),
+                            notes
+                        )
                         st.success('顧客を追加しました！')
                     else:
                         st.error('会社名は必須です。')
-                        
+            
         elif sub_menu in ['顧客編集', 'Edit Customer']:
             st.header('顧客編集')
             df = get_customers()
             if not df.empty:
-                customer_id = st.selectbox('編集する顧客を選択', df['id'])
-                customer = df[df['id'] == customer_id].iloc[0]
+                corporate_number = st.selectbox('編集する顧客を選択', df['corporate_number'])
+                customer = df[df['corporate_number'] == corporate_number].iloc[0]
                 
                 with st.form('edit_customer_form'):
                     company_name = st.text_input('会社名', customer['company_name'])
                     contact_person = st.text_input('担当者名', customer['contact_person'])
                     email = st.text_input('メールアドレス', customer['email'])
                     phone = st.text_input('電話番号', customer['phone'])
-                    address = st.text_input('住所', customer['address'])
+                    address = st.text_area('住所', customer['address'])
+                    last_contact_date = st.date_input('最終接触日', datetime.strptime(customer['last_contact_date'], '%Y-%m-%d'))
                     notes = st.text_area('備考', customer['notes'])
                     
                     if st.form_submit_button('更新'):
-                        update_customer(customer_id, company_name, contact_person, email, phone, address, notes)
-                        st.success('顧客情報を更新しました！')
+                        if company_name:
+                            update_customer(
+                                corporate_number,
+                                company_name,
+                                contact_person,
+                                email,
+                                phone,
+                                address,
+                                last_contact_date.strftime('%Y-%m-%d'),
+                                notes
+                            )
+                            st.success('顧客情報を更新しました！')
+                        else:
+                            st.error('会社名は必須です。')
             else:
                 st.info('編集可能な顧客がありません。')
             
@@ -330,9 +354,9 @@ def main():
             st.header('顧客削除')
             df = get_customers()
             if not df.empty:
-                customer_id = st.selectbox('削除する顧客を選択', df['id'])
+                corporate_number = st.selectbox('削除する顧客を選択', df['corporate_number'])
                 if st.button('削除'):
-                    delete_customer(customer_id)
+                    delete_customer(corporate_number)
                     st.success('顧客を削除しました！')
             else:
                 st.info('削除可能な顧客がありません。')
@@ -354,8 +378,8 @@ def main():
                     'project_name': '案件名',
                     'status': 'ステータス',
                     'start_date': '開始日',
-                    'end_date': '終了予定日',
-                    'budget': '予算（円）'
+                    'end_date': '終了日',
+                    'budget': '予算'
                 }
                 display_df = display_df.rename(columns=column_names)
                 
@@ -373,11 +397,11 @@ def main():
                     st.write(f"**案件名:** {selected_project['project_name']}")
                     st.write(f"**ステータス:** {selected_project['status']}")
                     st.write(f"**開始日:** {selected_project['start_date']}")
+                    st.write(f"**終了日:** {selected_project['end_date']}")
+                    st.write(f"**予算:** {selected_project['budget']}")
                 
                 with col2:
-                    st.write(f"**終了予定日:** {selected_project['end_date']}")
-                    st.write(f"**予算:** {selected_project['budget']:,}円")
-                    st.write(f"**案件詳細:**")
+                    st.write(f"**説明:**")
                     st.write(selected_project['description'])
             else:
                 st.info('登録されている案件がありません。')
@@ -387,20 +411,30 @@ def main():
             customers_df = get_customers()
             if not customers_df.empty:
                 with st.form('add_project_form'):
-                    customer_id = st.selectbox('顧客を選択', customers_df['id'])
+                    # 顧客選択用の辞書を作成
+                    customer_options = {f"{row['company_name']} ({row['corporate_number']})": row['corporate_number'] 
+                                      for _, row in customers_df.iterrows()}
+                    selected_customer = st.selectbox('顧客を選択', options=list(customer_options.keys()))
+                    corporate_number = customer_options[selected_customer]
+                    
                     project_name = st.text_input('案件名')
-                    status = st.selectbox('ステータス', ['未着手', '進行中', '完了', '中断'])
+                    status = st.selectbox('ステータス', ['未着手', '進行中', '完了', '保留'])
                     start_date = st.date_input('開始日')
-                    end_date = st.date_input('終了予定日')
-                    budget = st.number_input('予算（円）', min_value=0, step=10000)
-                    description = st.text_area('案件詳細')
+                    end_date = st.date_input('終了日')
+                    budget = st.number_input('予算', min_value=0)
+                    description = st.text_area('説明')
                     
                     if st.form_submit_button('追加'):
                         if project_name:
-                            add_project(customer_id, project_name, status, 
-                                      start_date.strftime('%Y-%m-%d'),
-                                      end_date.strftime('%Y-%m-%d'),
-                                      budget, description)
+                            add_project(
+                                corporate_number,
+                                project_name,
+                                status,
+                                start_date.strftime('%Y-%m-%d'),
+                                end_date.strftime('%Y-%m-%d'),
+                                budget,
+                                description
+                            )
                             st.success('案件を追加しました！')
                         else:
                             st.error('案件名は必須です。')
@@ -415,20 +449,30 @@ def main():
                 project = df[df['id'] == project_id].iloc[0]
                 
                 with st.form('edit_project_form'):
+                    corporate_number = st.selectbox('顧客を選択', get_customers()['corporate_number'], index=int(project['corporate_number'])-1)
                     project_name = st.text_input('案件名', project['project_name'])
-                    status = st.selectbox('ステータス', ['未着手', '進行中', '完了', '中断'], 
-                                        index=['未着手', '進行中', '完了', '中断'].index(project['status']))
+                    status = st.selectbox('ステータス', ['未着手', '進行中', '完了', '保留'],
+                                        index=['未着手', '進行中', '完了', '保留'].index(project['status']))
                     start_date = st.date_input('開始日', datetime.strptime(project['start_date'], '%Y-%m-%d'))
-                    end_date = st.date_input('終了予定日', datetime.strptime(project['end_date'], '%Y-%m-%d'))
-                    budget = st.number_input('予算（円）', min_value=0, step=10000, value=project['budget'])
-                    description = st.text_area('案件詳細', project['description'])
+                    end_date = st.date_input('終了日', datetime.strptime(project['end_date'], '%Y-%m-%d'))
+                    budget = st.number_input('予算', min_value=0, value=project['budget'])
+                    description = st.text_area('説明', project['description'])
                     
                     if st.form_submit_button('更新'):
-                        update_project(project_id, project_name, status,
-                                     start_date.strftime('%Y-%m-%d'),
-                                     end_date.strftime('%Y-%m-%d'),
-                                     budget, description)
-                        st.success('案件情報を更新しました！')
+                        if project_name:
+                            update_project(
+                                project_id,
+                                corporate_number,
+                                project_name,
+                                status,
+                                start_date.strftime('%Y-%m-%d'),
+                                end_date.strftime('%Y-%m-%d'),
+                                budget,
+                                description
+                            )
+                            st.success('案件を更新しました！')
+                        else:
+                            st.error('案件名は必須です。')
             else:
                 st.info('編集可能な案件がありません。')
         
@@ -495,10 +539,10 @@ def main():
             if not customers_df.empty:
                 with st.form('add_report_form'):
                     report_date = st.date_input('日付', datetime.now())
-                    customer_id = st.selectbox('顧客を選択', customers_df['id'])
+                    corporate_number = st.selectbox('顧客を選択', customers_df['corporate_number'])
                     
                     # 選択された顧客の案件を取得
-                    projects_df = get_projects(customer_id)
+                    projects_df = get_projects(corporate_number)
                     project_id = None
                     if not projects_df.empty:
                         project_id = st.selectbox('案件を選択', projects_df['id'])
@@ -511,7 +555,7 @@ def main():
                     if st.form_submit_button('追加'):
                         add_daily_report(
                             report_date.strftime('%Y-%m-%d'),
-                            customer_id,
+                            corporate_number,
                             project_id,
                             contact_type,
                             contact_content,
@@ -531,10 +575,10 @@ def main():
                 
                 with st.form('edit_report_form'):
                     report_date = st.date_input('日付', datetime.strptime(report['report_date'], '%Y-%m-%d'))
-                    customer_id = st.selectbox('顧客を選択', get_customers()['id'], index=int(report['customer_id'])-1)
+                    corporate_number = st.selectbox('顧客を選択', get_customers()['corporate_number'], index=int(report['corporate_number'])-1)
                     
                     # 選択された顧客の案件を取得
-                    projects_df = get_projects(customer_id)
+                    projects_df = get_projects(corporate_number)
                     project_id = None
                     if not projects_df.empty:
                         project_id = st.selectbox('案件を選択', projects_df['id'])
@@ -549,7 +593,7 @@ def main():
                         update_daily_report(
                             report_id,
                             report_date.strftime('%Y-%m-%d'),
-                            customer_id,
+                            corporate_number,
                             project_id,
                             contact_type,
                             contact_content,
