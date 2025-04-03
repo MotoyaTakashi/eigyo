@@ -191,26 +191,104 @@ def main():
     # サイドバーで操作を選択
     st.sidebar.title('メニュー')
     
-    # メインカテゴリの選択
-    main_category = st.sidebar.selectbox(
-        '管理カテゴリを選択',
-        ['顧客管理', '案件管理', '営業日報']
+    # 言語選択
+    language = st.sidebar.selectbox(
+        '言語 / Language',
+        ['日本語', 'English']
     )
     
-    # 顧客管理の場合
-    if main_category == '顧客管理':
-        st.sidebar.header('顧客管理メニュー')
-        customer_menu = st.sidebar.selectbox(
-            '操作を選択',
-            ['顧客一覧', '顧客追加', '顧客編集', '顧客削除']
-        )
-        
-        if customer_menu == '顧客一覧':
+    # メインカテゴリの選択
+    main_category = st.sidebar.selectbox(
+        '管理カテゴリを選択' if language == '日本語' else 'Select Category',
+        ['顧客管理', '案件管理', '営業日報'] if language == '日本語' else ['Customer Management', 'Project Management', 'Daily Report']
+    )
+    
+    # メニュー項目の定義
+    menu_items = {
+        '日本語': {
+            '顧客管理': {
+                'header': '顧客管理メニュー',
+                'items': ['顧客一覧', '顧客追加', '顧客編集', '顧客削除']
+            },
+            '案件管理': {
+                'header': '案件管理メニュー',
+                'items': ['案件一覧', '案件追加', '案件編集', '案件削除']
+            },
+            '営業日報': {
+                'header': '営業日報メニュー',
+                'items': ['日報一覧', '日報追加', '日報編集', '日報削除']
+            }
+        },
+        'English': {
+            'Customer Management': {
+                'header': 'Customer Management Menu',
+                'items': ['Customer List', 'Add Customer', 'Edit Customer', 'Delete Customer']
+            },
+            'Project Management': {
+                'header': 'Project Management Menu',
+                'items': ['Project List', 'Add Project', 'Edit Project', 'Delete Project']
+            },
+            'Daily Report': {
+                'header': 'Daily Report Menu',
+                'items': ['Report List', 'Add Report', 'Edit Report', 'Delete Report']
+            }
+        }
+    }
+    
+    # メニュー項目の対応関係
+    menu_mapping = {
+        '日本語': {
+            '顧客管理': 'Customer Management',
+            '案件管理': 'Project Management',
+            '営業日報': 'Daily Report'
+        },
+        'English': {
+            'Customer Management': '顧客管理',
+            'Project Management': '案件管理',
+            'Daily Report': '営業日報'
+        }
+    }
+    
+    # 現在の言語とカテゴリに対応するメニュー項目を取得
+    current_menu = menu_items[language][main_category]
+    st.sidebar.header(current_menu['header'])
+    
+    # サブメニューの選択
+    sub_menu = st.sidebar.selectbox(
+        '操作を選択' if language == '日本語' else 'Select Operation',
+        current_menu['items']
+    )
+    
+    # メインカテゴリの処理
+    if main_category in ['顧客管理', 'Customer Management']:
+        # 顧客管理の処理
+        if sub_menu in ['顧客一覧', 'Customer List']:
             st.header('顧客一覧')
             df = get_customers()
-            st.dataframe(df)
+            if not df.empty:
+                # 表示する列を選択
+                display_columns = ['id', 'company_name', 'contact_person', 'email', 'phone', 'address', 'last_contact_date', 'notes']
+                display_df = df[display_columns].copy()
+                
+                # 列名を日本語に変更
+                column_names = {
+                    'id': 'ID',
+                    'company_name': '会社名',
+                    'contact_person': '担当者名',
+                    'email': 'メールアドレス',
+                    'phone': '電話番号',
+                    'address': '住所',
+                    'last_contact_date': '最終接触日',
+                    'notes': '備考'
+                }
+                display_df = display_df.rename(columns=column_names)
+                
+                # データフレームを表示
+                st.dataframe(display_df, use_container_width=True)
+            else:
+                st.info('登録されている顧客がありません。')
             
-        elif customer_menu == '顧客追加':
+        elif sub_menu in ['顧客追加', 'Add Customer']:
             st.header('顧客追加')
             with st.form('add_customer_form'):
                 company_name = st.text_input('会社名')
@@ -227,7 +305,7 @@ def main():
                     else:
                         st.error('会社名は必須です。')
                         
-        elif customer_menu == '顧客編集':
+        elif sub_menu in ['顧客編集', 'Edit Customer']:
             st.header('顧客編集')
             df = get_customers()
             if not df.empty:
@@ -248,7 +326,7 @@ def main():
             else:
                 st.info('編集可能な顧客がありません。')
             
-        elif customer_menu == '顧客削除':
+        elif sub_menu in ['顧客削除', 'Delete Customer']:
             st.header('顧客削除')
             df = get_customers()
             if not df.empty:
@@ -259,15 +337,9 @@ def main():
             else:
                 st.info('削除可能な顧客がありません。')
     
-    # 案件管理の場合
-    elif main_category == '案件管理':
-        st.sidebar.header('案件管理メニュー')
-        project_menu = st.sidebar.selectbox(
-            '操作を選択',
-            ['案件一覧', '案件追加', '案件編集', '案件削除']
-        )
-        
-        if project_menu == '案件一覧':
+    elif main_category in ['案件管理', 'Project Management']:
+        # 案件管理の処理
+        if sub_menu in ['案件一覧', 'Project List']:
             st.header('案件一覧')
             df = get_projects()
             if not df.empty:
@@ -310,7 +382,7 @@ def main():
             else:
                 st.info('登録されている案件がありません。')
         
-        elif project_menu == '案件追加':
+        elif sub_menu in ['案件追加', 'Add Project']:
             st.header('案件追加')
             customers_df = get_customers()
             if not customers_df.empty:
@@ -335,7 +407,7 @@ def main():
             else:
                 st.info('先に顧客を登録してください。')
         
-        elif project_menu == '案件編集':
+        elif sub_menu in ['案件編集', 'Edit Project']:
             st.header('案件編集')
             df = get_projects()
             if not df.empty:
@@ -360,7 +432,7 @@ def main():
             else:
                 st.info('編集可能な案件がありません。')
         
-        elif project_menu == '案件削除':
+        elif sub_menu in ['案件削除', 'Delete Project']:
             st.header('案件削除')
             df = get_projects()
             if not df.empty:
@@ -371,15 +443,9 @@ def main():
             else:
                 st.info('削除可能な案件がありません。')
     
-    # 営業日報の場合
     else:
-        st.sidebar.header('営業日報メニュー')
-        report_menu = st.sidebar.selectbox(
-            '操作を選択',
-            ['日報一覧', '日報追加', '日報編集', '日報削除']
-        )
-        
-        if report_menu == '日報一覧':
+        # 営業日報の処理
+        if sub_menu in ['日報一覧', 'Report List']:
             st.header('営業日報一覧')
             df = get_daily_reports()
             if not df.empty:
@@ -423,7 +489,7 @@ def main():
             else:
                 st.info('登録されている日報がありません。')
         
-        elif report_menu == '日報追加':
+        elif sub_menu in ['日報追加', 'Add Report']:
             st.header('営業日報追加')
             customers_df = get_customers()
             if not customers_df.empty:
@@ -456,7 +522,7 @@ def main():
             else:
                 st.info('先に顧客を登録してください。')
         
-        elif report_menu == '日報編集':
+        elif sub_menu in ['日報編集', 'Edit Report']:
             st.header('営業日報編集')
             df = get_daily_reports()
             if not df.empty:
@@ -494,7 +560,7 @@ def main():
             else:
                 st.info('編集可能な日報がありません。')
         
-        elif report_menu == '日報削除':
+        elif sub_menu in ['日報削除', 'Delete Report']:
             st.header('営業日報削除')
             df = get_daily_reports()
             if not df.empty:
