@@ -401,7 +401,7 @@ def main():
                     st.write(f"**ステータス:** {selected_project['status']}")
                     st.write(f"**開始日:** {selected_project['start_date']}")
                     st.write(f"**終了日:** {selected_project['end_date']}")
-                    st.write(f"**予算:** {selected_project['budget']}")
+                    st.write(f"**予算（千円）:** {selected_project['budget']}")
                 
                 with col2:
                     st.write(f"**説明:**")
