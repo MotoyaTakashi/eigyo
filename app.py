@@ -452,7 +452,24 @@ def main():
                 project = df[df['id'] == project_id].iloc[0]
                 
                 with st.form('edit_project_form'):
-                    corporate_number = st.selectbox('顧客を選択', get_customers()['corporate_number'], index=int(project['corporate_number'])-1)
+                    # 顧客選択用の辞書を作成
+                    customers_df = get_customers()
+                    customer_options = {f"{row['company_name']} ({row['corporate_number']})": row['corporate_number'] 
+                                      for _, row in customers_df.iterrows()}
+                    
+                    # 現在の顧客の法人番号に対応する表示名を探す
+                    current_customer_display = None
+                    for display, corp_num in customer_options.items():
+                        if corp_num == project['corporate_number']:
+                            current_customer_display = display
+                            break
+                    
+                    # デフォルト値として現在の顧客を設定
+                    selected_customer = st.selectbox('顧客を選択', 
+                                                   options=list(customer_options.keys()),
+                                                   index=list(customer_options.keys()).index(current_customer_display) if current_customer_display else 0)
+                    corporate_number = customer_options[selected_customer]
+                    
                     project_name = st.text_input('案件名', project['project_name'])
                     status = st.selectbox('ステータス', ['未着手', '進行中', '完了', '保留'],
                                         index=['未着手', '進行中', '完了', '保留'].index(project['status']))
