@@ -46,6 +46,7 @@ def init_db():
          start_date TEXT,
          end_date TEXT,
          budget INTEGER,
+         sales_person TEXT,
          description TEXT,
          FOREIGN KEY (corporate_number) REFERENCES customers (corporate_number))
     ''')
@@ -105,13 +106,13 @@ def delete_customer(corporate_number):
     conn.close()
 
 # 案件データの追加
-def add_project(corporate_number, project_name, status, start_date, end_date, budget, description):
+def add_project(corporate_number, project_name, status, start_date, end_date, budget, sales_person, description):
     conn = sqlite3.connect('customers.db')
     c = conn.cursor()
     c.execute('''
-        INSERT INTO projects (corporate_number, project_name, status, start_date, end_date, budget, description)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (corporate_number, project_name, status, start_date, end_date, budget, description))
+        INSERT INTO projects (corporate_number, project_name, status, start_date, end_date, budget, sales_person, description)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (corporate_number, project_name, status, start_date, end_date, budget, sales_person, description))
     conn.commit()
     conn.close()
 
@@ -135,14 +136,14 @@ def get_projects(corporate_number=None):
     return df
 
 # 案件データの更新
-def update_project(id, corporate_number, project_name, status, start_date, end_date, budget, description):
+def update_project(id, corporate_number, project_name, status, start_date, end_date, budget, sales_person, description):
     conn = sqlite3.connect('customers.db')
     c = conn.cursor()
     c.execute('''
         UPDATE projects
-        SET corporate_number=?, project_name=?, status=?, start_date=?, end_date=?, budget=?, description=?
+        SET corporate_number=?, project_name=?, status=?, start_date=?, end_date=?, budget=?, sales_person=?, description=?
         WHERE id=?
-    ''', (corporate_number, project_name, status, start_date, end_date, budget, description, id))
+    ''', (corporate_number, project_name, status, start_date, end_date, budget, sales_person, description, id))
     conn.commit()
     conn.close()
 
@@ -424,7 +425,7 @@ def main():
             df = get_projects()
             if not df.empty:
                 # 表示する列を選択
-                display_columns = ['id', 'company_name', 'project_name', 'status', 'start_date', 'end_date', 'budget']
+                display_columns = ['id', 'company_name', 'project_name', 'status', 'start_date', 'end_date', 'budget', 'sales_person']
                 display_df = df[display_columns].copy()
                 
                 # 列名を日本語に変更
@@ -435,12 +436,13 @@ def main():
                     'status': 'ステータス',
                     'start_date': '開始日',
                     'end_date': '終了予定日',
-                    'budget': '予算'
+                    'budget': '予算',
+                    'sales_person': '営業担当'
                 }
                 display_df = display_df.rename(columns=column_names)
                 
-                # データフレームを表示（インデックスを非表示に）
-                st.dataframe(display_df, use_container_width=True, hide_index=True)
+                # データフレームを表示
+                st.dataframe(display_df, use_container_width=True)
                 
                 # 案件の詳細を表示するセクション
                 st.subheader('案件詳細')
@@ -478,6 +480,7 @@ def main():
                     start_date = st.date_input('開始日')
                     end_date = st.date_input('終了予定日')
                     budget = st.number_input('予算（千円）', min_value=0)
+                    sales_person = st.text_input('担当者名')
                     description = st.text_area('説明')
                     
                     if st.form_submit_button('追加'):
@@ -489,6 +492,7 @@ def main():
                                 start_date.strftime('%Y-%m-%d'),
                                 end_date.strftime('%Y-%m-%d'),
                                 budget,
+                                sales_person,
                                 description
                             )
                             st.success('案件を追加しました！')
@@ -529,6 +533,7 @@ def main():
                     start_date = st.date_input('開始日', datetime.strptime(project['start_date'], '%Y-%m-%d'))
                     end_date = st.date_input('終了予定日', datetime.strptime(project['end_date'], '%Y-%m-%d'))
                     budget = st.number_input('予算（千円）', min_value=0, value=project['budget'])
+                    sales_person = st.text_input('担当者名', project['sales_person'])
                     description = st.text_area('説明', project['description'])
                     
                     if st.form_submit_button('更新'):
@@ -541,6 +546,7 @@ def main():
                                 start_date.strftime('%Y-%m-%d'),
                                 end_date.strftime('%Y-%m-%d'),
                                 budget,
+                                sales_person,
                                 description
                             )
                             st.success('案件を更新しました！')
