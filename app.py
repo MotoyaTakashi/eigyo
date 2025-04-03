@@ -2,11 +2,28 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 from datetime import datetime
+import hashlib
 
 # データベース接続
 def init_db():
     conn = sqlite3.connect('customers.db')
     c = conn.cursor()
+    # ユーザーテーブル
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users
+        (username TEXT PRIMARY KEY,
+         password TEXT NOT NULL,
+         role TEXT NOT NULL)
+    ''')
+    # デフォルトユーザーの追加（パスワードは"password"のハッシュ）
+    try:
+        default_password = hashlib.sha256("password".encode()).hexdigest()
+        c.execute('''
+            INSERT OR IGNORE INTO users (username, password, role)
+            VALUES (?, ?, ?)
+        ''', ('admin', default_password, 'admin'))
+    except:
+        pass
     # 顧客テーブル
     c.execute('''
         CREATE TABLE IF NOT EXISTS customers
@@ -181,12 +198,48 @@ def delete_daily_report(id):
     conn.commit()
     conn.close()
 
+# ユーザー認証
+def authenticate_user(username, password):
+    conn = sqlite3.connect('customers.db')
+    c = conn.cursor()
+    hashed_password = hashlib.sha256(password.encode()).hexdigest()
+    c.execute('SELECT * FROM users WHERE username=? AND password=?', (username, hashed_password))
+    user = c.fetchone()
+    conn.close()
+    return user
+
 # アプリケーションのメイン部分
 def main():
-    st.title('営業顧客管理システム')
-    
     # データベースの初期化
     init_db()
+    
+    # セッション状態の初期化
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+        st.session_state.username = None
+        st.session_state.role = None
+
+    # ログイン画面
+    if not st.session_state.authenticated:
+        st.sidebar.title("ログイン")
+        username = st.sidebar.text_input("ユーザー名")
+        password = st.sidebar.text_input("パスワード", type="password")
+        
+        if st.sidebar.button("ログイン"):
+            user = authenticate_user(username, password)
+            if user:
+                st.session_state.authenticated = True
+                st.session_state.username = user[0]
+                st.session_state.role = user[2]
+                st.sidebar.success("ログイン成功！")
+                st.rerun()
+            else:
+                st.sidebar.error("ユーザー名またはパスワードが正しくありません。")
+        
+        st.stop()
+    
+    # メインアプリケーション
+    st.title("営業管理システム")
     
     # サイドバーで操作を選択
     st.sidebar.title('メニュー')
