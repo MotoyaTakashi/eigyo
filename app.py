@@ -286,8 +286,8 @@ def main():
                 }
                 display_df = display_df.rename(columns=column_names)
                 
-                # データフレームを表示
-                st.dataframe(display_df, use_container_width=True)
+                # データフレームを表示（インデックスを非表示に）
+                st.dataframe(display_df, use_container_width=True, hide_index=True)
             else:
                 st.info('登録されている顧客がありません。')
             
@@ -386,8 +386,8 @@ def main():
                 }
                 display_df = display_df.rename(columns=column_names)
                 
-                # データフレームを表示
-                st.dataframe(display_df, use_container_width=True)
+                # データフレームを表示（インデックスを非表示に）
+                st.dataframe(display_df, use_container_width=True, hide_index=True)
                 
                 # 案件の詳細を表示するセクション
                 st.subheader('案件詳細')
@@ -528,8 +528,8 @@ def main():
                 }
                 display_df = display_df.rename(columns=column_names)
                 
-                # データフレームを表示
-                st.dataframe(display_df, use_container_width=True)
+                # データフレームを表示（インデックスを非表示に）
+                st.dataframe(display_df, use_container_width=True, hide_index=True)
                 
                 # 日報の詳細を表示するセクション
                 st.subheader('日報詳細')
@@ -625,24 +625,22 @@ def main():
                     
                     # 選択された顧客の案件を取得
                     projects_df = get_projects(corporate_number)
-                    project_id = None
-                    if not projects_df.empty:
-                        # 案件選択用の辞書を作成
-                        project_options = {f"{row['project_name']}": row['id'] 
-                                         for _, row in projects_df.iterrows()}
-                        
-                        # 現在の案件のIDに対応する案件名を探す
-                        current_project_name = None
+                    project_options = {f"{row['project_name']}": row['id'] 
+                                     for _, row in projects_df.iterrows()}
+                    
+                    # 現在の案件のIDに対応する案件名を探す
+                    current_project_name = None
+                    if report['project_id'] is not None:  # project_idがNoneでない場合のみ処理
                         for project_name, pid in project_options.items():
                             if pid == report['project_id']:
                                 current_project_name = project_name
                                 break
-                        
-                        # デフォルト値として現在の案件を設定
-                        selected_project = st.selectbox('案件を選択', 
-                                                      options=list(project_options.keys()),
-                                                      index=list(project_options.keys()).index(current_project_name) if current_project_name else 0)
-                        project_id = project_options[selected_project]
+                    
+                    # デフォルト値として現在の案件を設定
+                    selected_project = st.selectbox('案件を選択', 
+                                                  options=list(project_options.keys()),
+                                                  index=list(project_options.keys()).index(current_project_name) if current_project_name else 0)
+                    project_id = project_options[selected_project]
                     
                     contact_type = st.selectbox('接触種別', ['電話', 'メール', '訪問', 'オンライン会議', 'その他'],
                                               index=['電話', 'メール', '訪問', 'オンライン会議', 'その他'].index(report['contact_type']))
