@@ -191,6 +191,9 @@ def main():
     # サイドバーで操作を選択
     st.sidebar.title('メニュー')
     
+    # GitHubのIssuesページへのリンクを追加
+    st.sidebar.markdown("[GitHub Issues](https://github.com/MotoyaTakashi/eigyo/issues)")
+    
     # 言語選択
     language = st.sidebar.selectbox(
         '言語 / Language',
