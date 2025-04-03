@@ -381,7 +381,7 @@ def main():
                     'project_name': '案件名',
                     'status': 'ステータス',
                     'start_date': '開始日',
-                    'end_date': '終了日',
+                    'end_date': '終了予定日',
                     'budget': '予算'
                 }
                 display_df = display_df.rename(columns=column_names)
@@ -400,7 +400,7 @@ def main():
                     st.write(f"**案件名:** {selected_project['project_name']}")
                     st.write(f"**ステータス:** {selected_project['status']}")
                     st.write(f"**開始日:** {selected_project['start_date']}")
-                    st.write(f"**終了日:** {selected_project['end_date']}")
+                    st.write(f"**終了予定日:** {selected_project['end_date']}")
                     st.write(f"**予算（千円）:** {selected_project['budget']}")
                 
                 with col2:
@@ -423,7 +423,7 @@ def main():
                     project_name = st.text_input('案件名')
                     status = st.selectbox('ステータス', ['未着手', '進行中', '完了', '保留'])
                     start_date = st.date_input('開始日')
-                    end_date = st.date_input('終了日')
+                    end_date = st.date_input('終了予定日')
                     budget = st.number_input('予算（千円）', min_value=0)
                     description = st.text_area('説明')
                     
@@ -474,7 +474,7 @@ def main():
                     status = st.selectbox('ステータス', ['未着手', '進行中', '完了', '保留'],
                                         index=['未着手', '進行中', '完了', '保留'].index(project['status']))
                     start_date = st.date_input('開始日', datetime.strptime(project['start_date'], '%Y-%m-%d'))
-                    end_date = st.date_input('終了日', datetime.strptime(project['end_date'], '%Y-%m-%d'))
+                    end_date = st.date_input('終了予定日', datetime.strptime(project['end_date'], '%Y-%m-%d'))
                     budget = st.number_input('予算（千円）', min_value=0, value=project['budget'])
                     description = st.text_area('説明', project['description'])
                     
