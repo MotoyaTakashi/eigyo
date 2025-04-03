@@ -424,7 +424,7 @@ def main():
                     status = st.selectbox('ステータス', ['未着手', '進行中', '完了', '保留'])
                     start_date = st.date_input('開始日')
                     end_date = st.date_input('終了日')
-                    budget = st.number_input('予算', min_value=0)
+                    budget = st.number_input('予算（千円）', min_value=0)
                     description = st.text_area('説明')
                     
                     if st.form_submit_button('追加'):
@@ -475,7 +475,7 @@ def main():
                                         index=['未着手', '進行中', '完了', '保留'].index(project['status']))
                     start_date = st.date_input('開始日', datetime.strptime(project['start_date'], '%Y-%m-%d'))
                     end_date = st.date_input('終了日', datetime.strptime(project['end_date'], '%Y-%m-%d'))
-                    budget = st.number_input('予算', min_value=0, value=project['budget'])
+                    budget = st.number_input('予算（千円）', min_value=0, value=project['budget'])
                     description = st.text_area('説明', project['description'])
                     
                     if st.form_submit_button('更新'):
@@ -559,13 +559,22 @@ def main():
             if not customers_df.empty:
                 with st.form('add_report_form'):
                     report_date = st.date_input('日付', datetime.now())
-                    corporate_number = st.selectbox('顧客を選択', customers_df['corporate_number'])
+                    
+                    # 顧客選択用の辞書を作成
+                    customer_options = {f"{row['company_name']} ({row['corporate_number']})": row['corporate_number'] 
+                                      for _, row in customers_df.iterrows()}
+                    selected_customer = st.selectbox('顧客を選択', options=list(customer_options.keys()))
+                    corporate_number = customer_options[selected_customer]
                     
                     # 選択された顧客の案件を取得
                     projects_df = get_projects(corporate_number)
                     project_id = None
                     if not projects_df.empty:
-                        project_id = st.selectbox('案件を選択', projects_df['id'])
+                        # 案件選択用の辞書を作成
+                        project_options = {f"{row['project_name']}": row['id'] 
+                                         for _, row in projects_df.iterrows()}
+                        selected_project = st.selectbox('案件を選択', options=list(project_options.keys()))
+                        project_id = project_options[selected_project]
                     
                     contact_type = st.selectbox('接触種別', ['電話', 'メール', '訪問', 'オンライン会議', 'その他'])
                     contact_content = st.text_area('接触内容')
@@ -595,13 +604,45 @@ def main():
                 
                 with st.form('edit_report_form'):
                     report_date = st.date_input('日付', datetime.strptime(report['report_date'], '%Y-%m-%d'))
-                    corporate_number = st.selectbox('顧客を選択', get_customers()['corporate_number'], index=int(report['corporate_number'])-1)
+                    
+                    # 顧客選択用の辞書を作成
+                    customers_df = get_customers()
+                    customer_options = {f"{row['company_name']} ({row['corporate_number']})": row['corporate_number'] 
+                                      for _, row in customers_df.iterrows()}
+                    
+                    # 現在の顧客の法人番号に対応する表示名を探す
+                    current_customer_display = None
+                    for display, corp_num in customer_options.items():
+                        if corp_num == report['corporate_number']:
+                            current_customer_display = display
+                            break
+                    
+                    # デフォルト値として現在の顧客を設定
+                    selected_customer = st.selectbox('顧客を選択', 
+                                                   options=list(customer_options.keys()),
+                                                   index=list(customer_options.keys()).index(current_customer_display) if current_customer_display else 0)
+                    corporate_number = customer_options[selected_customer]
                     
                     # 選択された顧客の案件を取得
                     projects_df = get_projects(corporate_number)
                     project_id = None
                     if not projects_df.empty:
-                        project_id = st.selectbox('案件を選択', projects_df['id'])
+                        # 案件選択用の辞書を作成
+                        project_options = {f"{row['project_name']}": row['id'] 
+                                         for _, row in projects_df.iterrows()}
+                        
+                        # 現在の案件のIDに対応する案件名を探す
+                        current_project_name = None
+                        for project_name, pid in project_options.items():
+                            if pid == report['project_id']:
+                                current_project_name = project_name
+                                break
+                        
+                        # デフォルト値として現在の案件を設定
+                        selected_project = st.selectbox('案件を選択', 
+                                                      options=list(project_options.keys()),
+                                                      index=list(project_options.keys()).index(current_project_name) if current_project_name else 0)
+                        project_id = project_options[selected_project]
                     
                     contact_type = st.selectbox('接触種別', ['電話', 'メール', '訪問', 'オンライン会議', 'その他'],
                                               index=['電話', 'メール', '訪問', 'オンライン会議', 'その他'].index(report['contact_type']))
