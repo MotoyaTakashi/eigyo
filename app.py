@@ -3,6 +3,8 @@ import pandas as pd
 import sqlite3
 from datetime import datetime
 import hashlib
+import shutil
+import os
 
 # データベース接続
 def init_db():
@@ -209,6 +211,14 @@ def authenticate_user(username, password):
     conn.close()
     return user
 
+# データベースのダウンロード
+def get_database_download():
+    try:
+        with open('customers.db', 'rb') as f:
+            return f.read()
+    except Exception as e:
+        return None
+
 # アプリケーションのメイン部分
 def main():
     # データベースの初期化
@@ -315,6 +325,19 @@ def main():
         '操作を選択' if language == '日本語' else 'Select Operation',
         current_menu['items']
     )
+    
+    # データベースダウンロードボタンを追加
+    st.sidebar.markdown("---")  # 区切り線を追加
+    db_data = get_database_download()
+    if db_data:
+        st.sidebar.download_button(
+            label="データベースをダウンロード",
+            data=db_data,
+            file_name="customers.db",
+            mime="application/x-sqlite3"
+        )
+    else:
+        st.sidebar.error("データベースファイルの読み込みに失敗しました。")
     
     # メインカテゴリの処理
     if main_category in ['顧客管理', 'Customer Management']:
