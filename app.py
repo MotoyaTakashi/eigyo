@@ -3,6 +3,7 @@ import pandas as pd
 import sqlite3
 from datetime import datetime
 import hashlib
+import requests
 
 # データベース接続
 def init_db():
@@ -262,8 +263,12 @@ def delete_attachment(attachment_id):
 # データベースのダウンロード
 def get_database_download():
     try:
-        with open('customers.db', 'rb') as f:
-            return f.read()
+        url = "https://raw.githubusercontent.com/MotoyaTakashi/eigyo/main/customers.db"
+        response = requests.get(url)
+        if response.status_code == 200:
+            return response.content
+        else:
+            return None
     except Exception as e:
         return None
 
