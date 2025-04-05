@@ -3,8 +3,6 @@ import pandas as pd
 import sqlite3
 from datetime import datetime
 import hashlib
-import shutil
-import os
 
 # データベース接続
 def init_db():
@@ -66,6 +64,16 @@ def init_db():
          FOREIGN KEY (corporate_number) REFERENCES customers (corporate_number),
          FOREIGN KEY (project_id) REFERENCES projects (id))
     ''')
+    # 添付ファイルテーブル
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS attachments
+        (id INTEGER PRIMARY KEY AUTOINCREMENT,
+         project_id INTEGER,
+         file_name TEXT NOT NULL,
+         file_data BLOB NOT NULL,
+         upload_date TEXT NOT NULL,
+         FOREIGN KEY (project_id) REFERENCES projects (id))
+    ''')
     conn.commit()
     conn.close()
 
@@ -115,8 +123,10 @@ def add_project(corporate_number, project_name, status, start_date, end_date, bu
         INSERT INTO projects (corporate_number, project_name, status, start_date, end_date, budget, sales_person, description)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ''', (corporate_number, project_name, status, start_date, end_date, budget, sales_person, description))
+    project_id = c.lastrowid  # 追加した案件のIDを取得
     conn.commit()
     conn.close()
+    return project_id  # 案件IDを返す
 
 # 案件データの取得
 def get_projects(corporate_number=None):
@@ -211,6 +221,44 @@ def authenticate_user(username, password):
     conn.close()
     return user
 
+# 添付ファイルの追加
+def add_attachment(project_id, file_name, file_data):
+    conn = sqlite3.connect('customers.db')
+    c = conn.cursor()
+    upload_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    c.execute('''
+        INSERT INTO attachments (project_id, file_name, file_data, upload_date)
+        VALUES (?, ?, ?, ?)
+    ''', (project_id, file_name, file_data, upload_date))
+    conn.commit()
+    conn.close()
+
+# 添付ファイルの取得
+def get_attachments(project_id):
+    conn = sqlite3.connect('customers.db')
+    c = conn.cursor()
+    c.execute('SELECT id, file_name, upload_date FROM attachments WHERE project_id = ? ORDER BY upload_date DESC', (project_id,))
+    attachments = c.fetchall()
+    conn.close()
+    return attachments
+
+# 添付ファイルのダウンロード
+def get_attachment_data(attachment_id):
+    conn = sqlite3.connect('customers.db')
+    c = conn.cursor()
+    c.execute('SELECT file_name, file_data FROM attachments WHERE id = ?', (attachment_id,))
+    result = c.fetchone()
+    conn.close()
+    return result
+
+# 添付ファイルの削除
+def delete_attachment(attachment_id):
+    conn = sqlite3.connect('customers.db')
+    c = conn.cursor()
+    c.execute('DELETE FROM attachments WHERE id = ?', (attachment_id,))
+    conn.commit()
+    conn.close()
+
 # データベースのダウンロード
 def get_database_download():
     try:
@@ -229,12 +277,6 @@ def main():
         st.session_state.authenticated = False
         st.session_state.username = None
         st.session_state.role = None
-    
-    # 営業日報追加用のセッション状態の初期化
-    if 'selected_customer' not in st.session_state:
-        st.session_state.selected_customer = None
-    if 'selected_project' not in st.session_state:
-        st.session_state.selected_project = None
 
     # ログイン画面
     if not st.session_state.authenticated:
@@ -512,9 +554,14 @@ def main():
                     sales_person = st.text_input('担当者名')
                     description = st.text_area('説明')
                     
+                    # 添付ファイルのアップロードセクション
+                    st.subheader('添付ファイル')
+                    uploaded_files = st.file_uploader("ファイルをアップロード", type=None, accept_multiple_files=True)
+                    
                     if st.form_submit_button('追加'):
                         if project_name:
-                            add_project(
+                            # 案件を追加し、IDを取得
+                            project_id = add_project(
                                 corporate_number,
                                 project_name,
                                 status,
@@ -524,7 +571,16 @@ def main():
                                 sales_person,
                                 description
                             )
-                            st.success('案件を追加しました！')
+                            
+                            # 添付ファイルの保存
+                            if uploaded_files:
+                                for uploaded_file in uploaded_files:
+                                    file_data = uploaded_file.read()
+                                    file_name = uploaded_file.name
+                                    add_attachment(project_id, file_name, file_data)
+                                st.success(f'案件を追加し、{len(uploaded_files)}個のファイルをアップロードしました。')
+                            else:
+                                st.success('案件を追加しました！')
                         else:
                             st.error('案件名は必須です。')
             else:
@@ -581,6 +637,58 @@ def main():
                             st.success('案件を更新しました！')
                         else:
                             st.error('案件名は必須です。')
+                
+                # 添付ファイルセクション（フォームの外に配置）
+                st.subheader('添付ファイル')
+                
+                # ファイルアップロード
+                uploaded_files = st.file_uploader("ファイルをアップロード", type=None, accept_multiple_files=True, key=f"upload_{project_id}")
+                if uploaded_files:
+                    for uploaded_file in uploaded_files:
+                        file_data = uploaded_file.read()
+                        file_name = uploaded_file.name
+                        add_attachment(project_id, file_name, file_data)
+                    st.success(f'{len(uploaded_files)}個のファイルをアップロードしました。')
+                    st.rerun()
+                
+                # 添付ファイル一覧
+                attachments = get_attachments(project_id)
+                if attachments:
+                    st.write("**添付ファイル一覧:**")
+                    # 重複を防ぐために、表示済みのファイルを追跡
+                    displayed_files = set()
+                    for attachment in attachments:
+                        attachment_id, file_name, upload_date = attachment
+                        
+                        # 既に表示済みのファイルはスキップ
+                        if file_name in displayed_files:
+                            continue
+                        
+                        displayed_files.add(file_name)
+                        
+                        col1, col2, col3 = st.columns([3, 2, 1])
+                        with col1:
+                            st.write(file_name)
+                        with col2:
+                            st.write(f"アップロード日時: {upload_date}")
+                        with col3:
+                            # ダウンロードボタン
+                            attachment_data = get_attachment_data(attachment_id)
+                            if attachment_data:
+                                file_name, file_data = attachment_data
+                                st.download_button(
+                                    label="ダウンロード",
+                                    data=file_data,
+                                    file_name=file_name,
+                                    key=f"download_{attachment_id}"
+                                )
+                            # 削除ボタン
+                            if st.button("削除", key=f"delete_{attachment_id}"):
+                                delete_attachment(attachment_id)
+                                st.success(f'ファイル {file_name} を削除しました。')
+                                st.rerun()
+                else:
+                    st.info('この案件には添付ファイルがありません。')
             else:
                 st.info('編集可能な案件がありません。')
         
@@ -645,47 +753,24 @@ def main():
             st.header('営業日報追加')
             customers_df = get_customers()
             if not customers_df.empty:
-                # 顧客選択用の辞書を作成
-                customer_options = {f"{row['company_name']} ({row['corporate_number']})": row['corporate_number'] 
-                                  for _, row in customers_df.iterrows()}
-                
-                # 顧客選択（フォームの外で行う）
-                selected_customer_display = st.selectbox(
-                    '顧客を選択', 
-                    options=list(customer_options.keys()),
-                    key='customer_selector'
-                )
-                
-                # 選択された顧客の法人番号を取得
-                corporate_number = customer_options[selected_customer_display]
-                
-                # 顧客が変更された場合、セッション状態を更新
-                if st.session_state.selected_customer != corporate_number:
-                    st.session_state.selected_customer = corporate_number
-                    st.session_state.selected_project = None
-                    st.rerun()
-                
-                # 選択された顧客の案件を取得
-                projects_df = get_projects(corporate_number)
-                
                 with st.form('add_report_form'):
                     report_date = st.date_input('日付', datetime.now())
                     
-                    # 案件選択
+                    # 顧客選択用の辞書を作成
+                    customer_options = {f"{row['company_name']} ({row['corporate_number']})": row['corporate_number'] 
+                                      for _, row in customers_df.iterrows()}
+                    selected_customer = st.selectbox('顧客を選択', options=list(customer_options.keys()))
+                    corporate_number = customer_options[selected_customer]
+                    
+                    # 選択された顧客の案件を取得
+                    projects_df = get_projects(corporate_number)
                     project_id = None
                     if not projects_df.empty:
                         # 案件選択用の辞書を作成
                         project_options = {f"{row['project_name']}": row['id'] 
                                          for _, row in projects_df.iterrows()}
-                        
-                        # 案件選択（フォーム内で行う）
-                        selected_project_display = st.selectbox(
-                            '案件を選択', 
-                            options=list(project_options.keys())
-                        )
-                        project_id = project_options[selected_project_display]
-                    else:
-                        st.info('選択した顧客に関連する案件がありません。')
+                        selected_project = st.selectbox('案件を選択', options=list(project_options.keys()))
+                        project_id = project_options[selected_project]
                     
                     contact_type = st.selectbox('接触種別', ['電話', 'メール', '訪問', 'オンライン会議', 'その他'])
                     contact_content = st.text_area('接触内容')
