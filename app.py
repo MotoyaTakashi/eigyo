@@ -266,13 +266,11 @@ def delete_attachment(attachment_id):
 # データベースのダウンロード
 def get_database_download():
     try:
-        url = "https://raw.githubusercontent.com/MotoyaTakashi/eigyo/main/customers.db"
-        response = requests.get(url)
-        if response.status_code == 200:
-            return response.content
-        else:
-            return None
+        # ローカルのcustomers.dbファイルを読み込む
+        with open('customers.db', 'rb') as f:
+            return f.read()
     except Exception as e:
+        print(f"データベースファイルの読み込みエラー: {str(e)}")
         return None
 
 # アプリケーションのメイン部分
@@ -310,9 +308,6 @@ def main():
     
     # サイドバーで操作を選択
     st.sidebar.title('メニュー')
-    
-    # GitHubのIssuesページへのリンクを追加
-    st.sidebar.markdown("[GitHub Issues](https://github.com/MotoyaTakashi/eigyo/issues)")
     
     # 言語選択
     language = st.sidebar.selectbox(
@@ -382,8 +377,8 @@ def main():
         current_menu['items']
     )
     
-    # データベースダウンロードボタンを追加
-    st.sidebar.markdown("---")  # 区切り線を追加
+    # ローカルのデータベースをダウンロードするボタンを表示
+    st.sidebar.markdown("---")
     db_data = get_database_download()
     if db_data:
         st.sidebar.download_button(
