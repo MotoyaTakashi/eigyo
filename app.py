@@ -138,12 +138,14 @@ def get_projects(corporate_number=None):
             FROM projects p
             JOIN customers c ON p.corporate_number = c.corporate_number
             WHERE p.corporate_number = ?
+            ORDER BY p.id DESC
         """, conn, params=(corporate_number,))
     else:
         df = pd.read_sql_query("""
             SELECT p.*, c.company_name
             FROM projects p
             JOIN customers c ON p.corporate_number = c.corporate_number
+            ORDER BY p.id DESC
         """, conn)
     conn.close()
     return df
