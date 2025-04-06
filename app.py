@@ -4,6 +4,7 @@ import sqlite3
 from datetime import datetime
 import hashlib
 import requests
+import os
 
 # データベース接続
 def init_db():
@@ -273,6 +274,47 @@ def get_database_download():
         print(f"データベースファイルの読み込みエラー: {str(e)}")
         return None
 
+# データベースのアップロード処理
+def upload_database(uploaded_file):
+    try:
+        # アップロードされたファイルを一時的に保存
+        with open('customers.db.temp', 'wb') as f:
+            f.write(uploaded_file.getvalue())
+        
+        # データベースの整合性チェック
+        try:
+            conn = sqlite3.connect('customers.db.temp')
+            required_tables = ['customers', 'projects', 'daily_reports', 'attachments', 'users']
+            cursor = conn.cursor()
+            
+            # 必要なテーブルが存在するか確認
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+            existing_tables = [table[0] for table in cursor.fetchall()]
+            
+            for table in required_tables:
+                if table not in existing_tables:
+                    conn.close()
+                    os.remove('customers.db.temp')
+                    return False, f"無効なデータベースファイル: {table}テーブルが見つかりません"
+            
+            conn.close()
+            
+            # 検証が成功したら既存のデータベースを置き換え
+            if os.path.exists('customers.db'):
+                os.remove('customers.db')
+            os.rename('customers.db.temp', 'customers.db')
+            return True, "データベースが正常にアップロードされました"
+            
+        except sqlite3.Error as e:
+            if os.path.exists('customers.db.temp'):
+                os.remove('customers.db.temp')
+            return False, f"無効なSQLiteデータベースファイル: {str(e)}"
+            
+    except Exception as e:
+        if os.path.exists('customers.db.temp'):
+            os.remove('customers.db.temp')
+        return False, f"アップロード中にエラーが発生しました: {str(e)}"
+
 # アプリケーションのメイン部分
 def main():
     # データベースの初期化
@@ -377,8 +419,26 @@ def main():
         current_menu['items']
     )
     
-    # ローカルのデータベースをダウンロードするボタンを表示
+    # データベース操作セクション
     st.sidebar.markdown("---")
+    
+    # データベースのアップロードボタン
+    uploaded_file = st.sidebar.file_uploader(
+        "データベースをアップロード",
+        type=['db'],
+        help="既存のデータベースファイルをアップロードします"
+    )
+    
+    if uploaded_file is not None:
+        if st.sidebar.button("アップロードを確定"):
+            success, message = upload_database(uploaded_file)
+            if success:
+                st.sidebar.success(message)
+                st.rerun()  # アプリケーションを再起動して変更を反映
+            else:
+                st.sidebar.error(message)
+    
+    # データベースのダウンロードボタン
     db_data = get_database_download()
     if db_data:
         st.sidebar.download_button(
