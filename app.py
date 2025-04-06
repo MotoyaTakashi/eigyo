@@ -49,6 +49,7 @@ def init_db():
          budget INTEGER,
          sales_person TEXT,
          description TEXT,
+         management_url TEXT,
          FOREIGN KEY (corporate_number) REFERENCES customers (corporate_number))
     ''')
     # 営業日報テーブル
@@ -117,13 +118,13 @@ def delete_customer(corporate_number):
     conn.close()
 
 # 案件データの追加
-def add_project(corporate_number, project_name, status, start_date, end_date, budget, sales_person, description):
+def add_project(corporate_number, project_name, status, start_date, end_date, budget, sales_person, description, management_url):
     conn = sqlite3.connect('customers.db')
     c = conn.cursor()
     c.execute('''
-        INSERT INTO projects (corporate_number, project_name, status, start_date, end_date, budget, sales_person, description)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (corporate_number, project_name, status, start_date, end_date, budget, sales_person, description))
+        INSERT INTO projects (corporate_number, project_name, status, start_date, end_date, budget, sales_person, description, management_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (corporate_number, project_name, status, start_date, end_date, budget, sales_person, description, management_url))
     project_id = c.lastrowid  # 追加した案件のIDを取得
     conn.commit()
     conn.close()
@@ -151,14 +152,14 @@ def get_projects(corporate_number=None):
     return df
 
 # 案件データの更新
-def update_project(id, corporate_number, project_name, status, start_date, end_date, budget, sales_person, description):
+def update_project(id, corporate_number, project_name, status, start_date, end_date, budget, sales_person, description, management_url):
     conn = sqlite3.connect('customers.db')
     c = conn.cursor()
     c.execute('''
         UPDATE projects
-        SET corporate_number=?, project_name=?, status=?, start_date=?, end_date=?, budget=?, sales_person=?, description=?
+        SET corporate_number=?, project_name=?, status=?, start_date=?, end_date=?, budget=?, sales_person=?, description=?, management_url=?
         WHERE id=?
-    ''', (corporate_number, project_name, status, start_date, end_date, budget, sales_person, description, id))
+    ''', (corporate_number, project_name, status, start_date, end_date, budget, sales_person, description, management_url, id))
     conn.commit()
     conn.close()
 
@@ -503,7 +504,7 @@ def main():
             df = get_projects()
             if not df.empty:
                 # 表示する列を選択
-                display_columns = ['id', 'company_name', 'project_name', 'status', 'start_date', 'end_date', 'budget', 'sales_person']
+                display_columns = ['id', 'company_name', 'project_name', 'status', 'start_date', 'end_date', 'budget', 'sales_person', 'management_url']
                 display_df = df[display_columns].copy()
                 
                 # 列名を日本語に変更
@@ -515,7 +516,8 @@ def main():
                     'start_date': '開始日',
                     'end_date': '終了予定日',
                     'budget': '予算',
-                    'sales_person': '営業担当'
+                    'sales_person': '営業担当',
+                    'management_url': '管理用URL'
                 }
                 display_df = display_df.rename(columns=column_names)
                 
@@ -535,6 +537,7 @@ def main():
                     st.write(f"**開始日:** {selected_project['start_date']}")
                     st.write(f"**終了予定日:** {selected_project['end_date']}")
                     st.write(f"**予算（千円）:** {selected_project['budget']}")
+                    st.write(f"**管理用URL:** {selected_project['management_url']}")
                 
                 with col2:
                     st.write(f"**説明:**")
@@ -560,6 +563,7 @@ def main():
                     budget = st.number_input('予算（千円）', min_value=0)
                     sales_person = st.text_input('担当者名')
                     description = st.text_area('説明')
+                    management_url = st.text_input('管理URL')
                     
                     # 添付ファイルのアップロードセクション
                     st.subheader('添付ファイル')
@@ -576,7 +580,8 @@ def main():
                                 end_date.strftime('%Y-%m-%d'),
                                 budget,
                                 sales_person,
-                                description
+                                description,
+                                management_url
                             )
                             
                             # 添付ファイルの保存
@@ -627,6 +632,7 @@ def main():
                     budget = st.number_input('予算（千円）', min_value=0, value=project['budget'])
                     sales_person = st.text_input('担当者名', project['sales_person'])
                     description = st.text_area('説明', project['description'])
+                    management_url = st.text_input('管理URL', project['management_url'])
                     
                     if st.form_submit_button('更新'):
                         if project_name:
@@ -639,7 +645,8 @@ def main():
                                 end_date.strftime('%Y-%m-%d'),
                                 budget,
                                 sales_person,
-                                description
+                                description,
+                                management_url
                             )
                             st.success('案件を更新しました！')
                         else:
