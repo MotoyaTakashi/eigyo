@@ -518,7 +518,7 @@ def main():
                 display_df = display_df.rename(columns=column_names)
                 
                 # データフレームを表示
-                st.dataframe(display_df, use_container_width=True)
+                st.dataframe(display_df, use_container_width=True, hide_index=True)
                 
                 # 案件の詳細を表示するセクション
                 st.subheader('案件詳細')
