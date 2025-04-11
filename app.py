@@ -192,7 +192,7 @@ def get_daily_reports():
         FROM daily_reports r
         LEFT JOIN customers c ON r.corporate_number = c.corporate_number
         LEFT JOIN projects p ON r.project_id = p.id
-        ORDER BY r.report_date DESC
+        ORDER BY r.id DESC
     """, conn)
     conn.close()
     return df
@@ -906,11 +906,15 @@ def main():
                                 current_project_name = project_name
                                 break
                     
-                    # デフォルト値として現在の案件を設定
-                    selected_project = st.selectbox('案件を選択', 
-                                                  options=list(project_options.keys()),
-                                                  index=list(project_options.keys()).index(current_project_name) if current_project_name else 0)
-                    project_id = project_options[selected_project]
+                    # 案件選択（project_idがNoneの場合は「案件なし」を選択）
+                    if not project_options:
+                        project_id = None
+                    else:
+                        # デフォルト値として現在の案件を設定
+                        selected_project = st.selectbox('案件を選択', 
+                                                      options=['案件なし'] + list(project_options.keys()),
+                                                      index=0 if current_project_name is None else list(project_options.keys()).index(current_project_name) + 1)
+                        project_id = None if selected_project == '案件なし' else project_options[selected_project]
                     
                     contact_type = st.selectbox('接触種別', ['電話', 'メール', '訪問', 'オンライン会議', 'その他'],
                                               index=['電話', 'メール', '訪問', 'オンライン会議', 'その他'].index(report['contact_type']))

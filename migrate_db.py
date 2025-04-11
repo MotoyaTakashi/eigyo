@@ -1,9 +1,15 @@
 import sqlite3
 import pandas as pd
+import os
 
 def migrate_database():
+    # 既存のデータベースファイルを削除
+    if os.path.exists('customers.db'):
+        os.remove('customers.db')
+        print("既存のcustomers.dbを削除しました。")
+    
     # ソースデータベースとターゲットデータベースの接続
-    source_conn = sqlite3.connect('customers (4).db')
+    source_conn = sqlite3.connect('customers_moto.db')
     target_conn = sqlite3.connect('customers.db')
     
     try:
@@ -14,9 +20,6 @@ def migrate_database():
         
         # 案件データの移行
         projects_df = pd.read_sql_query("SELECT * FROM projects", source_conn)
-        # management_urlカラムを追加
-        if 'management_url' not in projects_df.columns:
-            projects_df['management_url'] = ''
         projects_df.to_sql('projects', target_conn, if_exists='replace', index=False)
         print(f"案件データを移行しました: {len(projects_df)}件")
         
@@ -43,5 +46,5 @@ def migrate_database():
         source_conn.close()
         target_conn.close()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     migrate_database() 
