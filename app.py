@@ -64,6 +64,7 @@ def init_db():
          contact_content TEXT,
          next_action TEXT,
          notes TEXT,
+         sales_person TEXT,
          FOREIGN KEY (corporate_number) REFERENCES customers (corporate_number),
          FOREIGN KEY (project_id) REFERENCES projects (id))
     ''')
@@ -173,13 +174,13 @@ def delete_project(id):
     conn.close()
 
 # 営業日報の追加
-def add_daily_report(report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes):
+def add_daily_report(report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes, sales_person):
     conn = sqlite3.connect('customers.db')
     c = conn.cursor()
     c.execute('''
-        INSERT INTO daily_reports (report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes))
+        INSERT INTO daily_reports (report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes, sales_person)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes, sales_person))
     conn.commit()
     conn.close()
 
@@ -197,14 +198,14 @@ def get_daily_reports():
     return df
 
 # 営業日報の更新
-def update_daily_report(id, report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes):
+def update_daily_report(id, report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes, sales_person):
     conn = sqlite3.connect('customers.db')
     c = conn.cursor()
     c.execute('''
         UPDATE daily_reports
-        SET report_date=?, corporate_number=?, project_id=?, contact_type=?, contact_content=?, next_action=?, notes=?
+        SET report_date=?, corporate_number=?, project_id=?, contact_type=?, contact_content=?, next_action=?, notes=?, sales_person=?
         WHERE id=?
-    ''', (report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes, id))
+    ''', (report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes, sales_person, id))
     conn.commit()
     conn.close()
 
@@ -779,7 +780,7 @@ def main():
             df = get_daily_reports()
             if not df.empty:
                 # 表示する列を選択
-                display_columns = ['id', 'report_date', 'company_name', 'project_name', 'contact_type', 'contact_content']
+                display_columns = ['id', 'report_date', 'company_name', 'project_name', 'contact_type', 'contact_content', 'sales_person']
                 display_df = df[display_columns].copy()
                 
                 # 列名を日本語に変更
@@ -789,7 +790,8 @@ def main():
                     'company_name': '顧客名',
                     'project_name': '案件名',
                     'contact_type': '接触種別',
-                    'contact_content': '内容'
+                    'contact_content': '内容',
+                    'sales_person': '営業担当'
                 }
                 display_df = display_df.rename(columns=column_names)
                 
@@ -807,6 +809,7 @@ def main():
                     st.write(f"**顧客名:** {selected_report['company_name']}")
                     st.write(f"**案件名:** {selected_report['project_name']}")
                     st.write(f"**接触種別:** {selected_report['contact_type']}")
+                    st.write(f"**営業担当:** {selected_report['sales_person']}")
                 
                 with col2:
                     st.write(f"**接触内容:**")
@@ -845,6 +848,7 @@ def main():
                     contact_content = st.text_area('接触内容')
                     next_action = st.text_area('次回アクション')
                     notes = st.text_area('備考')
+                    sales_person = st.text_input('営業担当')
                     
                     if st.form_submit_button('追加'):
                         add_daily_report(
@@ -854,7 +858,8 @@ def main():
                             contact_type,
                             contact_content,
                             next_action,
-                            notes
+                            notes,
+                            sales_person
                         )
                         st.success('営業日報を追加しました！')
             else:
@@ -912,6 +917,7 @@ def main():
                     contact_content = st.text_area('接触内容', report['contact_content'])
                     next_action = st.text_area('次回アクション', report['next_action'])
                     notes = st.text_area('備考', report['notes'])
+                    sales_person = st.text_input('営業担当', report['sales_person'])
                     
                     if st.form_submit_button('更新'):
                         update_daily_report(
@@ -922,7 +928,8 @@ def main():
                             contact_type,
                             contact_content,
                             next_action,
-                            notes
+                            notes,
+                            sales_person
                         )
                         st.success('営業日報を更新しました！')
             else:
