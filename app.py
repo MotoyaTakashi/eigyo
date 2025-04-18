@@ -27,16 +27,21 @@ def init_db():
     except:
         pass
     # 顧客テーブル
+    # --- MIGRATION NOTE ---
+    # If the customers table already exists, you must migrate data to a new table with an auto-incrementing id.
+    # This schema ensures an auto-incrementing id is generated for each customer.
     c.execute('''
-        CREATE TABLE IF NOT EXISTS customers
-        (corporate_number TEXT PRIMARY KEY,
-         company_name TEXT NOT NULL,
-         contact_person TEXT,
-         email TEXT,
-         phone TEXT,
-         address TEXT,
-         last_contact_date TEXT,
-         notes TEXT)
+        CREATE TABLE IF NOT EXISTS customers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            corporate_number TEXT UNIQUE,
+            company_name TEXT NOT NULL,
+            contact_person TEXT,
+            email TEXT,
+            phone TEXT,
+            address TEXT,
+            last_contact_date TEXT,
+            notes TEXT
+        )
     ''')
     # 案件テーブル
     c.execute('''
@@ -56,7 +61,7 @@ def init_db():
     # 営業日報テーブル
     c.execute('''
         CREATE TABLE IF NOT EXISTS daily_reports
-        (id INTEGER PRIMARY KEY AUTOINCREMENT,
+        (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
          report_date TEXT NOT NULL,
          corporate_number TEXT,
          project_id INTEGER,
@@ -177,12 +182,25 @@ def delete_project(id):
 def add_daily_report(report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes, sales_person):
     conn = sqlite3.connect('customers.db')
     c = conn.cursor()
-    c.execute('''
-        INSERT INTO daily_reports (report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes, sales_person)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes, sales_person))
-    conn.commit()
-    conn.close()
+    try:
+        # Print the schema for debugging
+        c.execute("PRAGMA table_info(daily_reports)")
+        schema = c.fetchall()
+        print("daily_reports schema:", schema)
+        
+        c.execute('''
+            INSERT INTO daily_reports (report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes, sales_person)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (report_date, corporate_number, project_id, contact_type, contact_content, next_action, notes, sales_person))
+        new_id = c.lastrowid
+        print("Inserted ID:", new_id)
+        conn.commit()
+    except Exception as e:
+        print("Error during insert:", e)
+        new_id = None
+    finally:
+        conn.close()
+    return new_id
 
 # 営業日報の取得
 def get_daily_reports():
@@ -916,8 +934,12 @@ def main():
                                                       index=0 if current_project_name is None else list(project_options.keys()).index(current_project_name) + 1)
                         project_id = None if selected_project == '案件なし' else project_options[selected_project]
                     
-                    contact_type = st.selectbox('接触種別', ['電話', 'メール', '訪問', 'オンライン会議', 'その他'],
-                                              index=['電話', 'メール', '訪問', 'オンライン会議', 'その他'].index(report['contact_type']))
+                    contact_type_options = ['電話', 'メール', '訪問', 'オンライン会議', 'その他']
+                    try:
+                        contact_type_index = contact_type_options.index(report['contact_type'])
+                    except ValueError:
+                        contact_type_index = contact_type_options.index('その他')
+                    contact_type = st.selectbox('接触種別', contact_type_options, index=contact_type_index)
                     contact_content = st.text_area('接触内容', report['contact_content'])
                     next_action = st.text_area('次回アクション', report['next_action'])
                     notes = st.text_area('備考', report['notes'])
