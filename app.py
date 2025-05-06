@@ -836,6 +836,77 @@ def main():
                     st.write(selected_report['next_action'])
                     st.write(f"**備考:**")
                     st.write(selected_report['notes'])
+                
+                # 複製ボタンを追加
+                if st.button('この日報を複製'):
+                    # 複製用のフォームを表示
+                    with st.form('duplicate_report_form'):
+                        st.subheader('複製された日報の編集')
+                        report_date = st.date_input('日付', datetime.now())
+                        
+                        # 顧客選択用の辞書を作成
+                        customers_df = get_customers()
+                        customer_options = {f"{row['company_name']} ({row['corporate_number']})": row['corporate_number'] 
+                                          for _, row in customers_df.iterrows()}
+                        
+                        # 現在の顧客の法人番号に対応する表示名を探す
+                        current_customer_display = None
+                        for display, corp_num in customer_options.items():
+                            if corp_num == selected_report['corporate_number']:
+                                current_customer_display = display
+                                break
+                        
+                        # デフォルト値として現在の顧客を設定
+                        selected_customer = st.selectbox('顧客を選択', 
+                                                       options=list(customer_options.keys()),
+                                                       index=list(customer_options.keys()).index(current_customer_display) if current_customer_display else 0)
+                        corporate_number = customer_options[selected_customer]
+                        
+                        # 選択された顧客の案件を取得
+                        projects_df = get_projects(corporate_number)
+                        project_options = {f"{row['project_name']}": row['id'] 
+                                         for _, row in projects_df.iterrows()}
+                        
+                        # 現在の案件のIDに対応する案件名を探す
+                        current_project_name = None
+                        if selected_report['project_id'] is not None:
+                            for project_name, pid in project_options.items():
+                                if pid == selected_report['project_id']:
+                                    current_project_name = project_name
+                                    break
+                        
+                        # 案件選択
+                        if not project_options:
+                            project_id = None
+                        else:
+                            selected_project = st.selectbox('案件を選択', 
+                                                          options=['案件なし'] + list(project_options.keys()),
+                                                          index=0 if current_project_name is None else list(project_options.keys()).index(current_project_name) + 1)
+                            project_id = None if selected_project == '案件なし' else project_options[selected_project]
+                        
+                        contact_type_options = ['電話', 'メール', '訪問', 'オンライン会議', 'その他']
+                        try:
+                            contact_type_index = contact_type_options.index(selected_report['contact_type'])
+                        except ValueError:
+                            contact_type_index = contact_type_options.index('その他')
+                        contact_type = st.selectbox('接触種別', contact_type_options, index=contact_type_index)
+                        contact_content = st.text_area('接触内容', selected_report['contact_content'])
+                        next_action = st.text_area('次回アクション', selected_report['next_action'])
+                        notes = st.text_area('備考', selected_report['notes'])
+                        sales_person = st.text_input('営業担当', selected_report['sales_person'])
+                        
+                        if st.form_submit_button('複製して保存'):
+                            add_daily_report(
+                                report_date.strftime('%Y-%m-%d'),
+                                corporate_number,
+                                project_id,
+                                contact_type,
+                                contact_content,
+                                next_action,
+                                notes,
+                                sales_person
+                            )
+                            st.success('営業日報を複製しました！')
             else:
                 st.info('登録されている日報がありません。')
         
