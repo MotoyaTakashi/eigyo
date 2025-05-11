@@ -328,6 +328,27 @@ def upload_database(uploaded_file):
             os.remove('customers.db.temp')
         return False, f"アップロード中にエラーが発生しました: {str(e)}"
 
+# パスワード変更
+def change_password(username, old_password, new_password):
+    conn = sqlite3.connect('customers.db')
+    c = conn.cursor()
+    old_hashed_password = hashlib.sha256(old_password.encode()).hexdigest()
+    new_hashed_password = hashlib.sha256(new_password.encode()).hexdigest()
+    
+    # 現在のパスワードを確認
+    c.execute('SELECT * FROM users WHERE username=? AND password=?', (username, old_hashed_password))
+    user = c.fetchone()
+    
+    if user:
+        # パスワードを更新
+        c.execute('UPDATE users SET password=? WHERE username=?', (new_hashed_password, username))
+        conn.commit()
+        conn.close()
+        return True
+    else:
+        conn.close()
+        return False
+
 # アプリケーションのメイン部分
 def main():
     # データベースの初期化
@@ -355,6 +376,25 @@ def main():
                 st.rerun()
             else:
                 st.sidebar.error("ユーザー名またはパスワードが正しくありません。")
+        
+        # パスワード変更セクション
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("パスワード変更")
+        change_username = st.sidebar.text_input("ユーザー名", key="change_username")
+        old_password = st.sidebar.text_input("現在のパスワード", type="password", key="old_password")
+        new_password = st.sidebar.text_input("新しいパスワード", type="password", key="new_password")
+        confirm_password = st.sidebar.text_input("新しいパスワード（確認）", type="password", key="confirm_password")
+        
+        if st.sidebar.button("パスワード変更"):
+            if not change_username or not old_password or not new_password or not confirm_password:
+                st.sidebar.error("すべての項目を入力してください。")
+            elif new_password != confirm_password:
+                st.sidebar.error("新しいパスワードが一致しません。")
+            else:
+                if change_password(change_username, old_password, new_password):
+                    st.sidebar.success("パスワードを変更しました。")
+                else:
+                    st.sidebar.error("ユーザー名または現在のパスワードが正しくありません。")
         
         st.stop()
     
