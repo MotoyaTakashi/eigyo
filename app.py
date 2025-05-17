@@ -402,6 +402,12 @@ def main():
     st.title("営業管理システム")
     
     # サイドバーで操作を選択
+    # GitHub Issuesへのリンク
+    st.sidebar.markdown("[GitHub Issues](https://github.com/MotoyaTakashi/eigyo/issues)")
+    
+    # 顧客資料へのリンク
+    st.sidebar.markdown("[顧客資料](https://drive.google.com/drive/folders/1n3ED-kOru_m368Ct_SCZAj9fl_47Srxf)")
+    
     st.sidebar.title('メニュー')
     
     # 言語選択
@@ -535,7 +541,7 @@ def main():
         elif sub_menu in ['顧客追加', 'Add Customer']:
             st.header('顧客追加')
             with st.form('add_customer_form'):
-                corporate_number = st.text_input('法人番号')
+                corporate_number = st.text_input('法人番号 *')
                 company_name = st.text_input('会社名')
                 contact_person = st.text_input('担当者名')
                 email = st.text_input('メールアドレス')
@@ -545,7 +551,11 @@ def main():
                 notes = st.text_area('備考')
                 
                 if st.form_submit_button('追加'):
-                    if company_name:
+                    if not corporate_number:
+                        st.error('法人番号は必須です。')
+                    elif not company_name:
+                        st.error('会社名は必須です。')
+                    else:
                         add_customer(
                             corporate_number,
                             company_name,
@@ -557,8 +567,6 @@ def main():
                             notes
                         )
                         st.success('顧客を追加しました！')
-                    else:
-                        st.error('会社名は必須です。')
             
         elif sub_menu in ['顧客編集', 'Edit Customer']:
             st.header('顧客編集')
