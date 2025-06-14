@@ -105,14 +105,44 @@ def get_customers():
     return df
 
 # 顧客データの更新
-def update_customer(corporate_number, company_name, contact_person, email, phone, address, last_contact_date, notes):
+def update_customer(original_corporate_number, new_corporate_number, company_name, contact_person, email, phone, address, last_contact_date, notes):
+    """Update customer information.
+
+    If the corporate number has changed, update related tables as well.
+    """
     conn = sqlite3.connect('customers.db')
     c = conn.cursor()
-    c.execute('''
+    # Update the customer record
+    c.execute(
+        '''
         UPDATE customers
-        SET company_name=?, contact_person=?, email=?, phone=?, address=?, last_contact_date=?, notes=?
+        SET corporate_number=?, company_name=?, contact_person=?, email=?, phone=?, address=?, last_contact_date=?, notes=?
         WHERE corporate_number=?
-    ''', (company_name, contact_person, email, phone, address, last_contact_date, notes, corporate_number))
+        ''',
+        (
+            new_corporate_number,
+            company_name,
+            contact_person,
+            email,
+            phone,
+            address,
+            last_contact_date,
+            notes,
+            original_corporate_number,
+        ),
+    )
+
+    # If corporate number changed, update references in other tables
+    if original_corporate_number != new_corporate_number:
+        c.execute(
+            'UPDATE projects SET corporate_number=? WHERE corporate_number=?',
+            (new_corporate_number, original_corporate_number),
+        )
+        c.execute(
+            'UPDATE daily_reports SET corporate_number=? WHERE corporate_number=?',
+            (new_corporate_number, original_corporate_number),
+        )
+
     conn.commit()
     conn.close()
 
@@ -576,6 +606,7 @@ def main():
                 customer = df[df['corporate_number'] == corporate_number].iloc[0]
                 
                 with st.form('edit_customer_form'):
+                    corporate_number_input = st.text_input('法人番号', customer['corporate_number'])
                     company_name = st.text_input('会社名', customer['company_name'])
                     contact_person = st.text_input('担当者名', customer['contact_person'])
                     email = st.text_input('メールアドレス', customer['email'])
@@ -585,9 +616,14 @@ def main():
                     notes = st.text_area('備考', customer['notes'])
                     
                     if st.form_submit_button('更新'):
-                        if company_name:
+                        if not corporate_number_input:
+                            st.error('法人番号は必須です。')
+                        elif not company_name:
+                            st.error('会社名は必須です。')
+                        else:
                             update_customer(
                                 corporate_number,
+                                corporate_number_input,
                                 company_name,
                                 contact_person,
                                 email,
@@ -597,8 +633,6 @@ def main():
                                 notes
                             )
                             st.success('顧客情報を更新しました！')
-                        else:
-                            st.error('会社名は必須です。')
             else:
                 st.info('編集可能な顧客がありません。')
             
