@@ -116,6 +116,53 @@ def update_customer(corporate_number, company_name, contact_person, email, phone
     conn.commit()
     conn.close()
 
+# 顧客データの更新（法人番号変更対応）
+def update_customer_with_corporate_number(old_corporate_number, new_corporate_number, company_name, contact_person, email, phone, address, last_contact_date, notes):
+    conn = sqlite3.connect('customers.db')
+    c = conn.cursor()
+    try:
+        # 新しい法人番号が既に存在するかチェック（自分以外）
+        c.execute('SELECT corporate_number FROM customers WHERE corporate_number = ? AND corporate_number != ?', 
+                 (new_corporate_number, old_corporate_number))
+        if c.fetchone():
+            conn.close()
+            return False, "指定された法人番号は既に使用されています。"
+        
+        # トランザクション開始
+        c.execute('BEGIN TRANSACTION')
+        
+        # 顧客情報を更新
+        c.execute('''
+            UPDATE customers
+            SET corporate_number=?, company_name=?, contact_person=?, email=?, phone=?, address=?, last_contact_date=?, notes=?
+            WHERE corporate_number=?
+        ''', (new_corporate_number, company_name, contact_person, email, phone, address, last_contact_date, notes, old_corporate_number))
+        
+        # 関連する案件の法人番号を更新
+        c.execute('''
+            UPDATE projects
+            SET corporate_number=?
+            WHERE corporate_number=?
+        ''', (new_corporate_number, old_corporate_number))
+        
+        # 関連する日報の法人番号を更新
+        c.execute('''
+            UPDATE daily_reports
+            SET corporate_number=?
+            WHERE corporate_number=?
+        ''', (new_corporate_number, old_corporate_number))
+        
+        # トランザクションをコミット
+        c.execute('COMMIT')
+        conn.close()
+        return True, "顧客情報を更新しました。"
+        
+    except Exception as e:
+        # エラーが発生した場合はロールバック
+        c.execute('ROLLBACK')
+        conn.close()
+        return False, f"更新中にエラーが発生しました: {str(e)}"
+
 # 顧客データの削除
 def delete_customer(corporate_number):
     conn = sqlite3.connect('customers.db')
@@ -572,10 +619,20 @@ def main():
             st.header('顧客編集')
             df = get_customers()
             if not df.empty:
-                corporate_number = st.selectbox('編集する顧客を選択', df['corporate_number'])
+                # セッション状態で選択された顧客を管理
+                if 'selected_customer_for_edit' not in st.session_state:
+                    st.session_state.selected_customer_for_edit = df['corporate_number'].iloc[0]
+                
+                # セッション状態の法人番号が現在のデータに存在するかチェック
+                if st.session_state.selected_customer_for_edit not in df['corporate_number'].values:
+                    st.session_state.selected_customer_for_edit = df['corporate_number'].iloc[0]
+                
+                corporate_number = st.selectbox('編集する顧客を選択', df['corporate_number'], 
+                                              index=df['corporate_number'].tolist().index(st.session_state.selected_customer_for_edit))
                 customer = df[df['corporate_number'] == corporate_number].iloc[0]
                 
                 with st.form('edit_customer_form'):
+                    new_corporate_number = st.text_input('法人番号', customer['corporate_number'])
                     company_name = st.text_input('会社名', customer['company_name'])
                     contact_person = st.text_input('担当者名', customer['contact_person'])
                     email = st.text_input('メールアドレス', customer['email'])
@@ -585,20 +642,44 @@ def main():
                     notes = st.text_area('備考', customer['notes'])
                     
                     if st.form_submit_button('更新'):
-                        if company_name:
-                            update_customer(
-                                corporate_number,
-                                company_name,
-                                contact_person,
-                                email,
-                                phone,
-                                address,
-                                last_contact_date.strftime('%Y-%m-%d'),
-                                notes
-                            )
-                            st.success('顧客情報を更新しました！')
-                        else:
+                        if not new_corporate_number:
+                            st.error('法人番号は必須です。')
+                        elif not company_name:
                             st.error('会社名は必須です。')
+                        else:
+                            # 法人番号が変更された場合は新しい関数を使用
+                            if new_corporate_number != corporate_number:
+                                success, message = update_customer_with_corporate_number(
+                                    corporate_number,
+                                    new_corporate_number,
+                                    company_name,
+                                    contact_person,
+                                    email,
+                                    phone,
+                                    address,
+                                    last_contact_date.strftime('%Y-%m-%d'),
+                                    notes
+                                )
+                                if success:
+                                    # セッション状態を新しい法人番号に更新
+                                    st.session_state.selected_customer_for_edit = new_corporate_number
+                                    st.success(message)
+                                    st.rerun()  # 画面を更新して新しい法人番号を反映
+                                else:
+                                    st.error(message)
+                            else:
+                                # 法人番号が変更されていない場合は通常の更新
+                                update_customer(
+                                    corporate_number,
+                                    company_name,
+                                    contact_person,
+                                    email,
+                                    phone,
+                                    address,
+                                    last_contact_date.strftime('%Y-%m-%d'),
+                                    notes
+                                )
+                                st.success('顧客情報を更新しました！')
             else:
                 st.info('編集可能な顧客がありません。')
             
@@ -902,40 +983,46 @@ def main():
                 # 新しい日報のIDがセッション状態に存在する場合のみ編集フォームを表示
                 if 'new_report_id' in st.session_state:
                     new_report_id = st.session_state.new_report_id
+                    
+                    # フォームの外で顧客選択を行う
+                    customers_df = get_customers()
+                    customer_options = {f"{row['company_name']} ({row['corporate_number']})": row['corporate_number'] 
+                                      for _, row in customers_df.iterrows()}
+                    
+                    # 現在の顧客の法人番号に対応する表示名を探す
+                    current_customer_display = None
+                    for display, corp_num in customer_options.items():
+                        if corp_num == selected_report['corporate_number']:
+                            current_customer_display = display
+                            break
+                    
+                    # デフォルト値として現在の顧客を設定
+                    selected_customer = st.selectbox('顧客を選択', 
+                                                   options=list(customer_options.keys()),
+                                                   index=list(customer_options.keys()).index(current_customer_display) if current_customer_display else 0,
+                                                   key="customer_duplicate_select")
+                    corporate_number = customer_options[selected_customer]
+                    
+                    # 選択された顧客の案件を取得
+                    projects_df = get_projects(corporate_number)
+                    project_options = {f"{row['project_name']}": row['id'] 
+                                     for _, row in projects_df.iterrows()}
+                    
                     # 複製用のフォームを表示
                     with st.form('duplicate_report_form'):
                         st.subheader('複製された日報の編集')
                         st.write(f"**新しいID:** {new_report_id}")
                         report_date = st.date_input('日付', datetime.now())
                         
-                        # 顧客選択用の辞書を作成
-                        customers_df = get_customers()
-                        customer_options = {f"{row['company_name']} ({row['corporate_number']})": row['corporate_number'] 
-                                          for _, row in customers_df.iterrows()}
-                        
-                        # 現在の顧客の法人番号に対応する表示名を探す
-                        current_customer_display = None
-                        for display, corp_num in customer_options.items():
-                            if corp_num == selected_report['corporate_number']:
-                                current_customer_display = display
-                                break
-                        
-                        # デフォルト値として現在の顧客を設定
-                        selected_customer = st.selectbox('顧客を選択', 
-                                                       options=list(customer_options.keys()),
-                                                       index=list(customer_options.keys()).index(current_customer_display) if current_customer_display else 0)
-                        corporate_number = customer_options[selected_customer]
-                        
-                        # 選択された顧客の案件を取得
-                        projects_df = get_projects(corporate_number)
+                        # フォーム内で案件選択
                         project_id = None
-                        selected_project = None
-                        if not projects_df.empty:
-                            # 案件選択用の辞書を作成
-                            project_options = {f"{row['project_name']}": row['id'] 
-                                             for _, row in projects_df.iterrows()}
-                            selected_project = st.selectbox('案件を選択', options=list(project_options.keys()))
+                        if project_options:
+                            selected_project = st.selectbox('案件を選択', 
+                                                          options=list(project_options.keys()),
+                                                          key="project_duplicate_select")
                             project_id = project_options[selected_project]
+                        else:
+                            st.info('この顧客には登録されている案件がありません。')
                         
                         contact_type_options = ['電話', 'メール', '訪問', 'オンライン会議', 'その他']
                         try:
@@ -971,24 +1058,31 @@ def main():
             st.header('営業日報追加')
             customers_df = get_customers()
             if not customers_df.empty:
+                # フォームの外で顧客選択を行う
+                customer_options = {f"{row['company_name']} ({row['corporate_number']})": row['corporate_number'] 
+                                  for _, row in customers_df.iterrows()}
+                selected_customer = st.selectbox('顧客を選択', options=list(customer_options.keys()), key="customer_select")
+                corporate_number = customer_options[selected_customer]
+                
+                # 選択された顧客の案件を取得
+                projects_df = get_projects(corporate_number)
+                
+                # 案件選択肢を準備
+                project_options = {}
+                if not projects_df.empty:
+                    project_options = {f"{row['project_name']}": row['id'] 
+                                     for _, row in projects_df.iterrows()}
+                
                 with st.form('add_report_form'):
                     report_date = st.date_input('日付', datetime.now())
                     
-                    # 顧客選択用の辞書を作成
-                    customer_options = {f"{row['company_name']} ({row['corporate_number']})": row['corporate_number'] 
-                                      for _, row in customers_df.iterrows()}
-                    selected_customer = st.selectbox('顧客を選択', options=list(customer_options.keys()))
-                    corporate_number = customer_options[selected_customer]
-                    
-                    # 選択された顧客の案件を取得
-                    projects_df = get_projects(corporate_number)
+                    # フォーム内で案件選択
                     project_id = None
-                    if not projects_df.empty:
-                        # 案件選択用の辞書を作成
-                        project_options = {f"{row['project_name']}": row['id'] 
-                                         for _, row in projects_df.iterrows()}
-                        selected_project = st.selectbox('案件を選択', options=list(project_options.keys()))
+                    if project_options:
+                        selected_project = st.selectbox('案件を選択', options=list(project_options.keys()), key="project_select")
                         project_id = project_options[selected_project]
+                    else:
+                        st.info('この顧客には登録されている案件がありません。')
                     
                     contact_type = st.selectbox('接触種別', ['電話', 'メール', '訪問', 'オンライン会議', 'その他'])
                     contact_content = st.text_area('接触内容')
@@ -1018,48 +1112,57 @@ def main():
                 report_id = st.selectbox('編集する日報を選択', df['id'])
                 report = df[df['id'] == report_id].iloc[0]
                 
+                # フォームの外で顧客選択を行う
+                customers_df = get_customers()
+                customer_options = {f"{row['company_name']} ({row['corporate_number']})": row['corporate_number'] 
+                                  for _, row in customers_df.iterrows()}
+                
+                # 現在の顧客の法人番号に対応する表示名を探す
+                current_customer_display = None
+                for display, corp_num in customer_options.items():
+                    if corp_num == report['corporate_number']:
+                        current_customer_display = display
+                        break
+                
+                # デフォルト値として現在の顧客を設定
+                selected_customer = st.selectbox('顧客を選択', 
+                                               options=list(customer_options.keys()),
+                                               index=list(customer_options.keys()).index(current_customer_display) if current_customer_display else 0,
+                                               key="customer_edit_select")
+                corporate_number = customer_options[selected_customer]
+                
+                # 選択された顧客の案件を取得
+                projects_df = get_projects(corporate_number)
+                project_options = {f"{row['project_name']}": row['id'] 
+                                 for _, row in projects_df.iterrows()}
+                
+                # 現在の案件のIDに対応する案件名を探す
+                current_project_name = None
+                if report['project_id'] is not None:  # project_idがNoneでない場合のみ処理
+                    for project_name, pid in project_options.items():
+                        if pid == report['project_id']:
+                            current_project_name = project_name
+                            break
+                
                 with st.form('edit_report_form'):
                     report_date = st.date_input('日付', datetime.strptime(report['report_date'], '%Y-%m-%d'))
                     
-                    # 顧客選択用の辞書を作成
-                    customers_df = get_customers()
-                    customer_options = {f"{row['company_name']} ({row['corporate_number']})": row['corporate_number'] 
-                                      for _, row in customers_df.iterrows()}
-                    
-                    # 現在の顧客の法人番号に対応する表示名を探す
-                    current_customer_display = None
-                    for display, corp_num in customer_options.items():
-                        if corp_num == report['corporate_number']:
-                            current_customer_display = display
-                            break
-                    
-                    # デフォルト値として現在の顧客を設定
-                    selected_customer = st.selectbox('顧客を選択', 
-                                                   options=list(customer_options.keys()),
-                                                   index=list(customer_options.keys()).index(current_customer_display) if current_customer_display else 0)
-                    corporate_number = customer_options[selected_customer]
-                    
-                    # 選択された顧客の案件を取得
-                    projects_df = get_projects(corporate_number)
-                    project_options = {f"{row['project_name']}": row['id'] 
-                                     for _, row in projects_df.iterrows()}
-                    
-                    # 現在の案件のIDに対応する案件名を探す
-                    current_project_name = None
-                    if report['project_id'] is not None:  # project_idがNoneでない場合のみ処理
-                        for project_name, pid in project_options.items():
-                            if pid == report['project_id']:
-                                current_project_name = project_name
-                                break
-                    
-                    # 案件選択（project_idがNoneの場合は「案件なし」を選択）
+                    # フォーム内で案件選択
                     if not project_options:
                         project_id = None
+                        st.info('この顧客には登録されている案件がありません。')
                     else:
                         # デフォルト値として現在の案件を設定
-                        selected_project = st.selectbox('案件を選択', 
-                                                      options=['案件なし'] + list(project_options.keys()),
-                                                      index=0 if current_project_name is None else list(project_options.keys()).index(current_project_name) + 1)
+                        if current_project_name and current_project_name in project_options:
+                            selected_project = st.selectbox('案件を選択', 
+                                                          options=['案件なし'] + list(project_options.keys()),
+                                                          index=list(project_options.keys()).index(current_project_name) + 1,
+                                                          key="project_edit_select")
+                        else:
+                            selected_project = st.selectbox('案件を選択', 
+                                                          options=['案件なし'] + list(project_options.keys()),
+                                                          index=0,
+                                                          key="project_edit_select")
                         project_id = None if selected_project == '案件なし' else project_options[selected_project]
                     
                     contact_type_options = ['電話', 'メール', '訪問', 'オンライン会議', 'その他']
