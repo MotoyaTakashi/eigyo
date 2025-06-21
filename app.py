@@ -448,6 +448,15 @@ def main():
     # メインアプリケーション
     st.title("営業管理システム")
     
+    STATUS_OPTIONS = [
+        '01:コンタクト',
+        '02:コールド',
+        '03:ウォーム',
+        '04:ホット',
+        '05:顧客',
+        '06:デッド'
+    ]
+    
     # サイドバーで操作を選択
     # GitHub Issuesへのリンク
     st.sidebar.markdown("[GitHub Issues](https://github.com/MotoyaTakashi/eigyo/issues)")
@@ -754,7 +763,7 @@ def main():
                     corporate_number = customer_options[selected_customer]
                     
                     project_name = st.text_input('案件名')
-                    status = st.selectbox('ステータス', ['未着手', '進行中', '完了', '保留'])
+                    status = st.selectbox('ステータス', STATUS_OPTIONS)
                     start_date = st.date_input('開始日')
                     end_date = st.date_input('終了予定日')
                     budget = st.number_input('予算（千円）', min_value=0)
@@ -822,8 +831,15 @@ def main():
                     corporate_number = customer_options[selected_customer]
                     
                     project_name = st.text_input('案件名', project['project_name'])
-                    status = st.selectbox('ステータス', ['未着手', '進行中', '完了', '保留'],
-                                        index=['未着手', '進行中', '完了', '保留'].index(project['status']))
+                    
+                    # 現在のステータスのインデックスを探す
+                    try:
+                        status_index = STATUS_OPTIONS.index(project['status'])
+                    except ValueError:
+                        status_index = 0 # 見つからない場合はデフォルトで先頭を選択
+                        
+                    status = st.selectbox('ステータス', STATUS_OPTIONS, index=status_index)
+                    
                     start_date = st.date_input('開始日', datetime.strptime(project['start_date'], '%Y-%m-%d'))
                     end_date = st.date_input('終了予定日', datetime.strptime(project['end_date'], '%Y-%m-%d'))
                     budget = st.number_input('予算（千円）', min_value=0, value=project['budget'])
