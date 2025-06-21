@@ -5,6 +5,7 @@ from datetime import datetime
 import hashlib
 import requests
 import os
+import altair as alt
 
 # データベース接続
 def init_db():
@@ -475,12 +476,16 @@ def main():
     # メインカテゴリの選択
     main_category = st.sidebar.selectbox(
         '管理カテゴリを選択' if language == '日本語' else 'Select Category',
-        ['顧客管理', '案件管理', '営業日報'] if language == '日本語' else ['Customer Management', 'Project Management', 'Daily Report']
+        ['ダッシュボード', '顧客管理', '案件管理', '営業日報'] if language == '日本語' else ['Dashboard', 'Customer Management', 'Project Management', 'Daily Report']
     )
     
     # メニュー項目の定義
     menu_items = {
         '日本語': {
+            'ダッシュボード': {
+                'header': 'ダッシュボード',
+                'items': []
+            },
             '顧客管理': {
                 'header': '顧客管理メニュー',
                 'items': ['顧客一覧', '顧客追加', '顧客編集', '顧客削除']
@@ -495,6 +500,10 @@ def main():
             }
         },
         'English': {
+            'Dashboard': {
+                'header': 'Dashboard',
+                'items': []
+            },
             'Customer Management': {
                 'header': 'Customer Management Menu',
                 'items': ['Customer List', 'Add Customer', 'Edit Customer', 'Delete Customer']
@@ -513,11 +522,13 @@ def main():
     # メニュー項目の対応関係
     menu_mapping = {
         '日本語': {
+            'ダッシュボード': 'Dashboard',
             '顧客管理': 'Customer Management',
             '案件管理': 'Project Management',
             '営業日報': 'Daily Report'
         },
         'English': {
+            'Dashboard': 'ダッシュボード',
             'Customer Management': '顧客管理',
             'Project Management': '案件管理',
             'Daily Report': '営業日報'
@@ -529,10 +540,12 @@ def main():
     st.sidebar.header(current_menu['header'])
     
     # サブメニューの選択
-    sub_menu = st.sidebar.selectbox(
-        '操作を選択' if language == '日本語' else 'Select Operation',
-        current_menu['items']
-    )
+    sub_menu = None
+    if current_menu['items']:
+        sub_menu = st.sidebar.selectbox(
+            '操作を選択' if language == '日本語' else 'Select Operation',
+            current_menu['items']
+        )
     
     # データベース操作セクション
     st.sidebar.markdown("---")
@@ -566,7 +579,41 @@ def main():
         st.sidebar.error("データベースファイルの読み込みに失敗しました。")
     
     # メインカテゴリの処理
-    if main_category in ['顧客管理', 'Customer Management']:
+    if main_category in ['ダッシュボード', 'Dashboard']:
+        st.header('ダッシュボード' if language == '日本語' else 'Dashboard')
+        
+        # 案件データを取得
+        df_projects = get_projects()
+        
+        if not df_projects.empty:
+            st.subheader('ステータス別案件数' if language == '日本語' else 'Number of Projects by Status')
+            
+            # ステータスごとの案件数を集計
+            status_counts = df_projects['status'].value_counts().reindex(STATUS_OPTIONS, fill_value=0)
+            
+            # グラフ用にデータを整形
+            x_axis_label = 'ステータス' if language == '日本語' else 'Status'
+            y_axis_label = '案件数' if language == '日本語' else 'Count'
+            chart_data = pd.DataFrame({
+                x_axis_label: status_counts.index,
+                y_axis_label: status_counts.values
+            })
+            
+            # Altairで棒グラフを作成し、Y軸を0から始めるように設定
+            chart = alt.Chart(chart_data).mark_bar().encode(
+                x=alt.X(x_axis_label, sort=None, title=x_axis_label),
+                y=alt.Y(y_axis_label, scale=alt.Scale(zero=True), title=y_axis_label)
+            )
+            st.altair_chart(chart, use_container_width=True)
+            
+            # データテーブルも表示
+            st.write("データ詳細")
+            st.dataframe(chart_data, use_container_width=True, hide_index=True)
+
+        else:
+            st.info('登録されている案件がありません。')
+    
+    elif main_category in ['顧客管理', 'Customer Management']:
         # 顧客管理の処理
         if sub_menu in ['顧客一覧', 'Customer List']:
             st.header('顧客一覧')
