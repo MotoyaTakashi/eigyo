@@ -591,6 +591,9 @@ def main():
             # ステータスごとの案件数を集計
             status_counts = df_projects['status'].value_counts().reindex(STATUS_OPTIONS, fill_value=0)
             
+            # 最大案件数を取得
+            max_count = int(status_counts.max())
+            
             # グラフ用にデータを整形
             x_axis_label = 'ステータス' if language == '日本語' else 'Status'
             y_axis_label = '案件数' if language == '日本語' else 'Count'
@@ -599,10 +602,22 @@ def main():
                 y_axis_label: status_counts.values
             })
             
-            # Altairで棒グラフを作成し、Y軸を0から始めるように設定
+            # Y軸の目盛りを設定
+            # 案件数が少ない場合は、目盛りを明示的に設定して重複を防ぐ
+            if max_count > 0 and max_count <= 10:
+                axis_config = alt.Axis(values=list(range(max_count + 1)))
+            else:
+                # 案件数が多い場合は、目盛りの最小間隔を1に設定し、フォーマットを整数に
+                axis_config = alt.Axis(format='d', tickMinStep=1)
+
             chart = alt.Chart(chart_data).mark_bar().encode(
                 x=alt.X(x_axis_label, sort=None, title=x_axis_label),
-                y=alt.Y(y_axis_label, scale=alt.Scale(zero=True), title=y_axis_label)
+                y=alt.Y(
+                    y_axis_label,
+                    scale=alt.Scale(zero=True),
+                    title=y_axis_label,
+                    axis=axis_config
+                )
             )
             st.altair_chart(chart, use_container_width=True)
             
